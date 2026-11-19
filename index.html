@@ -706,7 +706,7 @@ for(const k in LVLS){const L=LVLS[k],f=v=>Math.round(v*LK);L.len0=L.len;L.time0=
 // v22: play order (internal level ids stay stable: 1-6 freeway, 7 K-Town, 8 DTLA, 9 Beverly Hills); progress = unlocked positions
 const ORDER=[1,2,7,3,8,4,9,5,6,12,10],NLV=11,POS=k=>{const i=ORDER.indexOf(k);return i>=0?i+1:k===11?ORDER.indexOf(6)+1:0;},KAT=p=>ORDER[clamp(p,1,NLV)-1];
 let SEL=1,UNL=1;try{const v3=localStorage.getItem('r405_unl93'),v=localStorage.getItem('r405_unl9');if(v3!=null)UNL=clamp(+v3||1,1,NLV);else if(v!=null){const o=+v||1;UNL=clamp(o>10?o-1:o,1,NLV);localStorage.setItem('r405_unl93',UNL);}else{const old=Math.max(1,Math.min(6,+localStorage.getItem('r405_unlocked')||1));let m=1;for(let k=1;k<=old;k++)m=Math.max(m,POS(k));UNL=m;localStorage.setItem('r405_unl93',UNL);}}catch(e){}
-const BUILD='v93',TEST_BUILD=true;UNL=NLV; // v50: every level open for everyone
+const BUILD='v94',TEST_BUILD=true;UNL=NLV; // v50: every level open for everyone
 {const m=/[?&]level=(\d+)/.exec(location.search);if(m){const n=+m[1];if(LVLS[n])setTimeout(()=>{if(state.mode=='title'){SEL=POS(n);startLevel(n,LVLS[n].subs?+(new URLSearchParams(location.search).get('sub')||1):undefined);}},60);}}
 function unlock(p){UNL=Math.min(NLV,Math.max(UNL,p));try{localStorage.setItem('r405_unl93',UNL);}catch(e){}}
 function GH(x){if(LV==3)return (48*Math.sin(x/1150)+26*Math.sin(x/430+1.3))*(x<1200?x/1200:1);const H=LVLS[LV].hills;return H?hillH(x,H):0;}
@@ -4432,7 +4432,7 @@ function renderIso(){F87.on=false;if(LV==10){skyRender();return;}if(XLV()&&state
  const tt=s.time,shx=(Math.sin(tt*57)*.6+Math.sin(tt*31.3)*.4)*s.shake,shy=(Math.sin(tt*47.1)*.6+Math.sin(tt*23.7)*.4)*s.shake;ctx.translate(shx,shy);
  if(s.lw==null){s.lw=PL*ILW;s.lane=PL;}
  const ez=1-Math.exp(-FDT*4.5);s.zoom=(s.zoom||1)+(((LV===1?.86:ZM93())/(1+Math.max(0,s.y-280)/1100))-(s.zoom||1))*ez;if(LV==11)s.zoom=Math.min(s.zoom,vgZoom());const z=s.zoom;const endC=(s.mode=="ending"||s.mode=="win")?(XLV()?(s.lx?0:150):LV==11?260:LV==6?150:LV==3?-110:200)*Math.min(1,(s.cutT||0)/2.5):(LV==11?VGCY:0);s.camY=(s.camY||0)+(Math.max(0,s.y-240)*0.8+endC-(s.camY||0))*(1-Math.exp(-FDT*(endC?2:6)));
- const lc=s.lx?s.lw*.85+126*.15:s.lw<0?88.2+s.lw*.62:s.lw*.3+126*.7;IO.cam=s.x;IO.e=ITER?TEw(s.x+64,s.lw):0;IO.x=vw*.3-(64*IF[0]+lc*IL[0]);IO.y=(LV===1&&!(s.lx&&s.lx.sc>0)?600:500)-(64*IF[1]+lc*IL[1])+s.camY-(LV==3?60:0)+(CITY()?80+CY93():0)+A93cy();IO.hz=150+s.camY*.3;
+ const lc=s.lx?s.lw*.85+126*.15:s.lw<0?88.2+s.lw*.62:s.lw*.3+126*.7;IO.cam=s.x;IO.e=ITER?TEw(s.x+64,s.lw):0;IO.x=vw*.3-(64*IF[0]+lc*IL[0])-CX94();IO.y=(LV===1&&!(s.lx&&s.lx.sc>0)?600:500)-(64*IF[1]+lc*IL[1])+s.camY-(LV==3?60:0)+(CITY()?80+CY93():0)+A93cy();IO.hz=150+s.camY*.3;
  const cam=s.x-vw*.28;XM=400;const dy=IO.hz-445;
  const sky=skyCache(vw);if(dy>-40)ctx.drawImage(sky,0,0,sky.width,3,-40,-10,vw+80,dy+40);ctx.drawImage(sky,-40,-40+dy,vw+80,800);
  ctx.save();ctx.translate(0,dy);clouds(vw,cam);if(LV<=2||LV==8)heli(vw);
@@ -9040,5 +9040,220 @@ for(const k of ORDER){const L=LVLS[k];if(L&&L.name&&/^LEVEL \d+/.test(L.name))L.
 // finishing the last sub-level of a level moves on to the next menu level (9-3 → 10 HOLLYWOOD PREMIERE)
 const SN93=sub85Next;sub85Next=function(){const s=state,P=s&&s.sub85;if(!P)return SN93();const h=SHL(),L=sub85List(h);if(L&&P.n<L.length)return SN93();
  const p=POS(h);if(p>=NLV)return SN93();const nx=KAT(p+1);SEL=p+1;if(nx===12)return sub85Start(12,1);if(sub85List(nx))return sub85Menu(nx);return startLevel(nx);};
+
+// ===== v94 · police-chopper discharge now hits what it visibly hits (all levels; reported on 5-1 / 5-2) =====
+// Root cause: the bolt + impact glow (40-100px) were drawn on the frozen aim point, but a hit needed the car's
+// anchor within D.zr*k (~11px) of it AND the car airborne above 20. A bolt that landed on the car's body, or on a
+// car that had just dropped back to the road during the charge (very common in the short city hops of 5-1/5-2),
+// did nothing. Now: hit box = the car's on-screen body (ellipse), ground or air; invulnerable cars visibly deflect.
+const ZAP94={rx:38,ry:24,win:.16};
+function zap94Box(H){const s=state,k=H.k||1,C=zapCar();if(!C||H.tx==null)return false;const dx=(H.tx-C[0])/(ZAP94.rx*k),dy=(H.ty-(C[1]-6*k))/(ZAP94.ry*k);return dx*dx+dy*dy<=1;}
+const ZT94=zapTick;zapTick=function(H,dt,D){const s=state;
+ if(H.wp==='fire'&&!H.hit&&H.wf+dt<ZAP94.win&&s.mode==='play'&&!(s.ww&&s.ww.tow)&&zap94Box(H)){
+  if(s.crashT>0||s.amG>0||s.zapInv>0){H.hit=2;zap94Deflect(H);}else{H.hit=1;H.wf+=dt;zapHit(H);s.zap94G=!s.air||s.y<20;if(s.zap94G){s.v*=.55;msg('⚡ ZAPPED ON THE ROAD! -3s');}return;}}
+ if(H.wp==='charge'){const p=H.wf/D.zc;if(p>=D.zf&&!H.f94){H.f94=1;msg('⚡ TARGET LOCKED — CHANGE LANE OR ALTITUDE!');s.msgT=1;}}else H.f94=0;
+ return ZT94(H,dt,D);};
+function zap94Deflect(H){const s=state;for(let i=0;i<26;i++)part(s.x+60+rnd(-30,30),(s.y||0)+30+rnd(-10,20),rnd(-320,320),rnd(-60,360),i%2?'#bfe4ff':'#ffffff',rnd(.2,.5),rnd(2,4));msg('⚡ BOLT DEFLECTED — STILL INVULNERABLE');try{SFX.zapHit&&SFX.zapHit();}catch(e){}}
+// on-hit: a white-blue screen flash + sparks burst so the hit always reads (both air and road hits)
+const ED94=elecDraw;elecDraw=function(){ED94();const s=state;if(!(s.elecT>1.55)||s.scrX==null)return;const a=(s.elecT-1.55)/.35;ctx.save();ctx.setTransform(DPR,0,0,DPR,0,0);ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(150,200,255,'+(.28*a).toFixed(3)+')';ctx.fillRect(0,0,W,H_());ctx.restore();};
+
+// ===== v94 · hero headlights =====
+// What was wrong: (1) strength came from the ENGINE level, not the sub-level being played (hlK: LV 2/7/11 → full beams,
+//  LV 1/6/9 → 70%) and any NIGHT>0 (even a 0.05 daytime tint) also meant full beams — so beams blazed in daylight
+//  (3-1, 7-1, 2-3, 4-2, 6-2 …) while tunnels got no boost; (2) the two lamps were drawn on different layers at
+//  mismatched spots: one lens under the car body at the far corner (hidden by the car), one on top at the near corner,
+//  so only one lamp ever showed; (3) beams were cut entirely as soon as the car pitched on a crest.
+// Now: one intensity from the sub-level's real time of day + tunnels/covered decks/blackout; daytime = lamps only
+// (DRL glint, no beams); two lamps on the car's front face, beams leave from each lamp and follow pitch.
+function hl94K(){const s=state;let n=NIGHT||0;try{const d=S90d();if(d){const v=tod90Night(d);if(v!=null)n=v;}}catch(e){}
+ let k=clamp((n-.04)/.3,0,1);let tun=0;try{if(tunnelNear(s.x+60,0))tun=1;}catch(e){}try{if(typeof f86Black==='function'&&f86Black()>.05)tun=1;}catch(e){}
+ if(s.mode==='intro'||s.mode==='play'||s.mode==='ending'||s.mode==='win'){if(tun)k=Math.max(k,.95);}return k;}
+hlK=function(){return Math.max(.12,hl94K());};
+const HL94={len:122,side:.31,hz:14};
+function hl94Lamp(s,d){return [s.x+HL94.len,s.lw+d*IPW*HL94.side];}
+hlBeam=function(s){const k=hl94K();if(k<.2||s.y>160||Math.cos(s.ang||0)<.5||Math.abs(s.roll||0)>.35)return;const a=k*(1-Math.max(0,s.y)/160),p=s.ang||0;if(a<=.03)return;
+ // beam reach shortens when the nose pitches up (crest) and lengthens slightly nose-down
+ const L=clamp(470-Math.sin(p)*900,160,560);ctx.save();ctx.globalCompositeOperation='lighter';
+ for(const d of [-1,1]){const [x0,wc]=hl94Lamp(s,d);
+  for(const [sp,al] of [[1,.22],[.62,.20],[.32,.16]]){const g=ctx.createLinearGradient(ipx(x0,wc),ipy(x0,wc,0),ipx(x0+L,wc),ipy(x0+L,wc,0));
+   g.addColorStop(0,'rgba(255,246,222,'+(al*a).toFixed(3)+')');g.addColorStop(.35,'rgba(245,242,225,'+(al*.55*a).toFixed(3)+')');g.addColorStop(1,'rgba(220,232,255,0)');ctx.fillStyle=g;
+   ctx.beginPath();iPath([[x0+4,wc-6*sp,0],[x0+L,wc-(26+40*sp),0],[x0+L,wc+(26+40*sp),0],[x0+4,wc+6*sp,0]]);ctx.fill();}}
+ // hot pool just ahead of the bumper
+ const px=s.x+HL94.len+70,X=ipx(px,s.lw),Y=ipy(px,s.lw,0),r=70,g=ctx.createRadialGradient(X,Y,0,X,Y,r);g.addColorStop(0,'rgba(255,248,230,'+(.20*a).toFixed(3)+')');g.addColorStop(1,'rgba(255,248,230,0)');
+ ctx.fillStyle=g;ctx.save();ctx.translate(X,Y);ctx.rotate(-.42);ctx.scale(1.6,.55);ctx.translate(-X,-Y);ctx.fillRect(X-r,Y-r,2*r,2*r);ctx.restore();ctx.restore();};
+hlFront=function(s){if(s.y>420||Math.cos(s.ang||0)<.5)return;const k=hl94K(),H=hlLens();ctx.save();ctx.globalCompositeOperation='lighter';
+ for(const d of [-1,1]){const [x,w]=hl94Lamp(s,d),X=ipx(x+1,w),Y=ipy(x+1,w,s.y+HL94.hz),sc=(d>0?1:.8)*(.75+.75*k);ctx.globalAlpha=Math.min(1,.45+.55*k)*(d>0?1:.8);ctx.drawImage(H.c,X-H.ox*sc,Y-H.oy*sc,H.w*sc,H.h*sc);
+  if(k>.3&&GLOW){flare(X,Y,26+30*k);}}
+ ctx.restore();};
+
+// ===== v94 · 6-3 BURBANK STUDIOS BACKLOT — rebuilt stunt scene + backlot sets (no studio trademarks) =====
+// Old (v93): stunt car + helicopter were tiny flat 2D sprites far up-screen, mixed into traffic, read as noise.
+// New: a full-size iso stunt car (same renderer as traffic, oriented across the street) launches off a steel kicker
+// ramp on the near sidewalk, arcs over your lane in slow-mo with motion ghosts, smoke & sparks, and is caught in a
+// cargo cradle under a big detailed helicopter hovering over the far sidewalk (rotor downwash on the ground), which
+// then climbs away with it. Film unit on set: techno-crane on a dolly track, video village with monitors, director's
+// chair, HMI light towers, 12x12 silk, clapper board, safety crew. Stages = numbered sound stages; NYC street facades.
+const WB94={camX:300,camMax:190,roll:1400,go:430,J:1.5,slow:.4,away:2.8,vcap:300,pts:500,
+ w0:-96,w1:NSW+64,h1:170,hx:0,hh:310,col:'#c81818'};
+function wb94Arc(u){u=clamp(u,0,1);const e=1-(1-u)*(1-u),de=2*(1-u);return {w:WB94.w0+(WB94.w1-WB94.w0)*u,h:44+(WB94.h1-44)*e+40*Math.sin(Math.PI*u),p:-Math.atan2((WB94.h1-44)*de+40*Math.PI*Math.cos(Math.PI*u),Math.abs(WB94.w1-WB94.w0))*.7};}
+// ---------- names: generic studio, no trademarks ----------
+(function(){const L=LVLS[4].subs,d=L&&L.find(q=>q.key==='lot');if(!d)return;
+ Object.assign(d,{title:'STUDIO BACKLOT · BURBANK',to:'🎬 STAGE 16',route:'Burbank Studios backlot · Gate 3 → Midwest Street → New York Street → Stage 16',
+  line:"Burbank Studios backlot... and they're shooting a big car stunt today!",hint:'Studio backlot · water tower & numbered sound stages · NYC street sets · a stunt car ramps OVER your lane into a helicopter — slow down for the cameras',
+  win:'THAT\'S A WRAP! 🎬',finishSign:['STAGE 16','That\'s a wrap!','6-3']});
+ d.cty=Object.assign({},d.cty,{ban:'BURBANK STUDIOS'});})();
+SPX.wbGate93=function(b){const x0=b.x0+30,x1=b.x1-30;
+ for(const x of [x0,x1-46]){iBox(x,x+46,FW-70,FW+16,0,150,'#efe6d2','#c9bb9c','#e2d6bc');for(let h=20;h<150;h+=26){ctx.fillStyle='rgba(120,100,70,.18)';iFaceW(FW+16,x,x+46,h,h+2);ctx.fill();}}
+ iBox(x0-10,x1+10,FW-60,FW+12,150,200,'#efe6d2','#c9bb9c','#e2d6bc');iBox(x0-18,x1+18,FW-68,FW+20,200,210,'#c8b48a','#9a8866','#b8a47c');
+ ctx.save();iPlane(x0-10,FW+12.4,196,IF);const bw=x1-x0+20;const g=ctx.createLinearGradient(0,6,0,36);g.addColorStop(0,'#203c78');g.addColorStop(1,'#0f2450');ctx.fillStyle=g;ctx.fillRect(10,6,bw-20,32);ctx.fillStyle='#ffd23a';ctx.fillRect(10,36,bw-20,3);
+ ctx.fillStyle='#fff';ctx.font='900 18px Georgia,serif';ctx.textAlign='center';ctx.fillText('★ BURBANK STUDIOS ★',bw/2,28);ctx.restore();
+ ctx.save();iPlane(x0+4,FW+16.4,132,IF);ctx.fillStyle='#203c78';ctx.font='900 11px '+UIF;ctx.fillText('GATE 3 · BACKLOT',0,0);ctx.restore();
+ iBox(x0+52,x0+70,FW+30,FW+48,0,34,'#d8d0c0','#a8a090','#c0b8a8');lglow(ipx(x0+61,FW+40),ipy(x0+61,FW+40,40),40,'rgba(255,230,160,.5)');
+ lglow(ipx((x0+x1)/2,FW+20),ipy((x0+x1)/2,FW+20,190),160,'rgba(255,230,160,.28)');};
+// water tower emblem: generic film-star roundel instead of a studio shield
+{const WT93=SPX.wtower93;SPX.wtower93=function(b){WT93(b);const cx=(b.x0+b.x1)/2,cw=FW-170,H=330,X=ipx(cx+50,cw+48),Y=ipy(cx+50,cw+48,H+60);
+ ctx.save();ctx.translate(X,Y);ctx.fillStyle='#e8eaee';ctx.beginPath();ctx.ellipse(0,2,34,38,0,0,TAU);ctx.fill();ctx.fillStyle='#203c78';ctx.beginPath();ctx.ellipse(0,2,28,32,0,0,TAU);ctx.fill();ctx.strokeStyle='#ffd23a';ctx.lineWidth=3;ctx.stroke();
+ ctx.fillStyle='#ffd23a';ctx.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r=i%2?7:16;ctx.lineTo(Math.cos(a)*r,-6+Math.sin(a)*r);}ctx.closePath();ctx.fill();
+ ctx.fillStyle='#fff';ctx.font='900 7.5px '+UIF;ctx.textAlign='center';ctx.fillText('BURBANK',0,18);ctx.fillText('STUDIOS',0,26);ctx.restore();};SPX.wtower93.solo=true;}
+// ---------- sound stage (numbered) ----------
+SPX.stage93=function(b){const x0=b.x0+12,x1=b.x1-12,D=FW-320,H=b.h,n=b.n93||16,t=state.time,LX=x1-x0;
+ iBox(x0,x1,D,FW,0,H,'#e2d6be','#bcae92','#ece2cc');
+ // pilasters + base course on the street face
+ for(let x=x0;x<=x1-18;x+=Math.max(70,LX/8)){iBox(x,x+14,FW,FW+5,0,H,'#e8dec8','#c2b496','#f2e8d2');}
+ ctx.fillStyle='#9a8c72';iFaceW(FW+.2,x0,x1,0,12);ctx.fill();ctx.fillStyle='rgba(255,255,255,.35)';iFaceW(FW+.2,x0,x1,H-8,H);ctx.fill();
+ // barrel roof with standing-seam ribs
+ for(let i=0;i<14;i++){const u0=i/14,u1=(i+1)/14,h0=H+Math.sin(u0*Math.PI)*52,h1=H+Math.sin(u1*Math.PI)*52,w0=D+(FW-D)*u0,w1=D+(FW-D)*u1;ctx.fillStyle=mixC93([140,132,116],[232,226,210],.35+.55*(1-u0));iPoly([[x0,w0,h0],[x1,w0,h0],[x1,w1,h1],[x0,w1,h1]]);ctx.fill();}
+ ctx.strokeStyle='rgba(90,84,72,.35)';ctx.lineWidth=1;ctx.beginPath();for(let x=x0+16;x<x1;x+=22){for(let i=0;i<14;i++){const u0=i/14,u1=(i+1)/14;ctx.moveTo(ipx(x,D+(FW-D)*u0),ipy(x,D+(FW-D)*u0,H+Math.sin(u0*Math.PI)*52));ctx.lineTo(ipx(x,D+(FW-D)*u1),ipy(x,D+(FW-D)*u1,H+Math.sin(u1*Math.PI)*52));}}ctx.stroke();
+ ctx.fillStyle='#c8bca2';iPoly([[x0,D,H],[x0,FW,H],...Array.from({length:13},(_,i)=>{const u=1-(i+1)/14;return [x0,D+(FW-D)*u,H+Math.sin(u*Math.PI)*52];})]);ctx.fill();
+ // rooftop HVAC units
+ for(let k=0;k<3;k++){const x=x0+LX*(.2+.3*k),w=FW-120;iBox(x,x+40,w-30,w,H+44,H+64,'#9aa0a8','#6a7078','#828890');}
+ // giant painted stage number in a disc
+ const cx=x0+LX*.22,R=Math.min(70,H*.3);ctx.save();iPlane(x0,FW+5.6,H-16,IF);ctx.fillStyle='#203c78';ctx.beginPath();ctx.ellipse(LX*.22,R+6,R,R,0,0,TAU);ctx.fill();ctx.strokeStyle='#ffd23a';ctx.lineWidth=4;ctx.stroke();
+ ctx.fillStyle='#fff';ctx.font='900 '+Math.round(R*1.15)+'px '+UIF;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(String(n),LX*.22,R+10);ctx.textBaseline='alphabetic';
+ ctx.fillStyle='#2a2a30';ctx.font='900 20px '+UIF;ctx.fillText('STAGE '+n,LX*.55,30);ctx.restore();
+ // elephant door (big sliding), personnel door + stair, red ROLLING beacon
+ const d0=x0+LX*.4,d1=x0+LX*.72;iBox(d0,d1,FW,FW+6,0,H*.55,'#8a8478','#5e584e','#7a7468');ctx.strokeStyle='rgba(30,30,30,.4)';ctx.lineWidth=1;ctx.beginPath();for(let k=1;k<8;k++){const x=d0+(d1-d0)*k/8;ctx.moveTo(ipx(x,FW+6),ipy(x,FW+6,0));ctx.lineTo(ipx(x,FW+6),ipy(x,FW+6,H*.55));}ctx.stroke();
+ ctx.fillStyle='#ffd23a';iFaceW(FW+6.2,d0,d1,H*.55-6,H*.55);ctx.fill();
+ iBox(x0+LX*.82,x0+LX*.82+26,FW,FW+3,0,44,'#5a5248','#3a342c','#4a443c');
+ const on=(t*1.6|0)%2,bx=x0+LX*.78;iBox(bx-6,bx+6,FW+4,FW+12,H*.62,H*.62+12,'#c81818','#801010','#a01414');lglow(ipx(bx,FW+10),ipy(bx,FW+10,H*.62+6),on?30:12,on?'rgba(255,40,40,.95)':'rgba(255,40,40,.3)');
+ ctx.save();iPlane(bx+10,FW+6.4,H*.62+12,IF);ctx.fillStyle='#c81818';ctx.fillRect(0,0,62,14);ctx.fillStyle='#fff';ctx.font='900 9px '+UIF;ctx.fillText('● ROLLING',5,10);ctx.restore();};
+SPX.stage93.solo=true;
+// ---------- New York Street facade (brownstones with stoops, fire escapes, awnings; scaffold behind) ----------
+const NYC94P=[['#7a3e2a','#5a2c1e','#8e4c34'],['#8a6a4e','#5e4834','#9e7c5e'],['#5e5a66','#3e3c46','#6e6a78'],['#9a4a3a','#6a3226','#ac5a48']];
+SPX.nyc94=function(b){const x0=b.x0+6,x1=b.x1-6,H=b.h,P=NYC94P[b.k94%4],LX=x1-x0,fl=Math.max(3,Math.round(H/52)),fh=(H-20)/fl;
+ iBox(x0,x1,FW-14,FW,0,H,P[2],P[1],P[0]);
+ // cornice
+ iBox(x0-4,x1+4,FW-18,FW+8,H-14,H,'#d8d0c0','#9a9284','#c8c0b0');
+ // windows grid
+ const nw=Math.max(2,Math.round(LX/46));for(let f=1;f<fl;f++){for(let i=0;i<nw;i++){const xa=x0+(i+.25)*LX/nw,xb=xa+LX/nw*.5,h0=f*fh+10,h1=h0+fh*.62;
+  ctx.fillStyle='#e8e0d0';iFaceW(FW+.3,xa-3,xb+3,h0-4,h1+4);ctx.fill();const lit=hr(b.k94*31+f*7+i,9)<.35;ctx.fillStyle=lit?'#ffd890':'#2a3240';iFaceW(FW+.5,xa,xb,h0,h1);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.18)';iFaceW(FW+.6,xa,xa+(xb-xa)*.4,h0+(h1-h0)*.5,h1);ctx.fill();}}
+ // fire escape (black iron platforms + ladders)
+ const fx0=x0+LX*.3,fx1=x0+LX*.62;ctx.strokeStyle='#14141a';ctx.lineWidth=1.4;for(let f=1;f<fl;f++){const h=f*fh+8;iBox(fx0,fx1,FW,FW+16,h-2,h,'#22222a','#14141a','#1a1a20');ctx.beginPath();for(let x=fx0;x<=fx1;x+=8){ctx.moveTo(ipx(x,FW+16),ipy(x,FW+16,h));ctx.lineTo(ipx(x,FW+16),ipy(x,FW+16,h+12));}ctx.moveTo(ipx(fx0,FW+16),ipy(fx0,FW+16,h+12));ctx.lineTo(ipx(fx1,FW+16),ipy(fx1,FW+16,h+12));ctx.stroke();
+  ctx.beginPath();ctx.moveTo(ipx(fx1-10,FW+12),ipy(fx1-10,FW+12,h));ctx.lineTo(ipx(fx1-26,FW+12),ipy(fx1-26,FW+12,h+fh));ctx.stroke();}
+ // stoop + door
+ const sx=x0+LX*.12;for(let k=0;k<5;k++)iBox(sx,sx+30,FW,FW+8+k*7,0,22-k*4,'#b8ae9e','#8a8070','#a89e8e');iBox(sx+4,sx+26,FW,FW+1,22,64,'#3a2418','#2a1a10','#4a2e1e');
+ // shop awning on the corner
+ const ax=x0+LX*.68;ctx.fillStyle=['#1a6a3a','#8a1a1a','#1a3a7a','#7a5a1a'][b.k94%4];iPoly([[ax,FW,58],[x1-4,FW,58],[x1-4,FW+26,44],[ax,FW+26,44]]);ctx.fill();ctx.fillStyle='rgba(255,255,255,.75)';for(let x=ax+6;x<x1-8;x+=14){iPoly([[x,FW+26,44],[x+7,FW+26,44],[x+7,FW+27,40],[x,FW+27,40]]);ctx.fill();}
+ // rooftop water tank (NYC)
+ if(b.k94%2===0){const tx=x0+LX*.75,tw=FW-60;for(const [a,c] of [[-12,-12],[12,-12],[-12,12],[12,12]])iBox(tx+a-1,tx+a+1,tw+c-1,tw+c+1,H,H+22,'#3a3026','#2a2018','#3a3026');iCyl(tx,tw,18,H+22,H+56,[90,66,44],[170,130,90],{n:16,band:'rgba(40,30,20,.35)',bs:8});}
+ // exposed scaffold bracing behind (it's a set)
+ ctx.strokeStyle='#7a6a52';ctx.lineWidth=2;ctx.beginPath();for(let x=x0+20;x<x1-10;x+=46){ctx.moveTo(ipx(x,FW-14),ipy(x,FW-14,H-6));ctx.lineTo(ipx(x,FW-150),ipy(x,FW-150,0));}ctx.stroke();};
+SPX.nyc94.solo=true;
+// ---------- film unit set dressing ----------
+function wb94Chair(x,w){iBox(x-9,x+9,w-8,w+8,14,16,'#2a2a30','#1a1a20','#22222a');ctx.strokeStyle='#5a3a1e';ctx.lineWidth=2;ctx.beginPath();for(const [a,c] of [[-9,-8],[9,-8],[-9,8],[9,8]]){ctx.moveTo(ipx(x+a,w+c),ipy(x+a,w+c,0));ctx.lineTo(ipx(x-a,w-c),ipy(x-a,w-c,16));}ctx.stroke();
+ ctx.save();iPlane(x-9,w-8,40,IF);ctx.fillStyle='#14141a';ctx.fillRect(0,0,18,14);ctx.fillStyle='#ffd23a';ctx.font='900 4.6px '+UIF;ctx.fillText('DIRECTOR',1.2,8.5);ctx.restore();}
+function wb94HMI(x,w,face,t){iBox(x-3,x+3,w-3,w+3,0,150,'#2a2a30','#16161a','#202024');for(const [a,c] of [[-30,0],[30,0],[0,-30],[0,30]]){ctx.strokeStyle='#202024';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ipx(x+a,w+c),ipy(x+a,w+c,0));ctx.lineTo(ipx(x,w),ipy(x,w,60));ctx.stroke();}
+ iBox(x-18,x+18,w-14,w+14,140,172,'#3a3a42','#1a1a20','#2a2a30');const X=ipx(x+face*14,w+16),Y=ipy(x+face*14,w+16,156);glow(X,Y,26,'rgba(255,252,235,.95)');lglow(X,Y,90,'rgba(255,248,220,.35)');
+ ctx.save();ctx.globalCompositeOperation='lighter';const g=ctx.createLinearGradient(X,Y,X-face*40,Y+150);g.addColorStop(0,'rgba(255,250,230,.22)');g.addColorStop(1,'rgba(255,250,230,0)');ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(X-8,Y);ctx.lineTo(X+8,Y);ctx.lineTo(X-face*30+70,Y+170);ctx.lineTo(X-face*30-70,Y+170);ctx.closePath();ctx.fill();ctx.restore();}
+function wb94Crane(x,w,t,aim){ // dolly track + techno-crane
+ ctx.strokeStyle='#8a8e96';ctx.lineWidth=2;ctx.beginPath();for(const dw of [-10,10]){ctx.moveTo(ipx(x-180,w+dw),ipy(x-180,w+dw,1));ctx.lineTo(ipx(x+180,w+dw),ipy(x+180,w+dw,1));}ctx.stroke();
+ ctx.strokeStyle='#5a4a3a';ctx.lineWidth=3;ctx.beginPath();for(let k=-180;k<=180;k+=24){ctx.moveTo(ipx(x+k,w-16),ipy(x+k,w-16,0));ctx.lineTo(ipx(x+k,w+16),ipy(x+k,w+16,0));}ctx.stroke();
+ const dx=x+Math.sin(t*.35)*120;iBox(dx-26,dx+26,w-18,w+18,4,26,'#2a2e36','#14161a','#1e2228');iBox(dx-8,dx+8,w-8,w+8,26,62,'#3a3e46','#1a1c22','#2a2e36');
+ const L=230,ang=aim,ex=dx+Math.cos(ang)*L,ew=w-Math.sin(ang)*L*.4,eh=62+Math.sin(t*.5)*30+80;ctx.lineCap='round';
+ for(const [lw,c] of [[9,'#14161a'],[6,'#3a3e46']]){ctx.strokeStyle=c;ctx.lineWidth=lw;ctx.beginPath();ctx.moveTo(ipx(dx-Math.cos(ang)*70,w+Math.sin(ang)*28),ipy(dx-Math.cos(ang)*70,w+Math.sin(ang)*28,40));ctx.lineTo(ipx(ex,ew),ipy(ex,ew,eh));ctx.stroke();}
+ iBox(dx-Math.cos(ang)*70-14,dx-Math.cos(ang)*70+14,w+Math.sin(ang)*28-12,w+Math.sin(ang)*28+12,26,52,'#6a6e76','#3a3e46','#50545c'); // counterweights
+ const X=ipx(ex,ew),Y=ipy(ex,ew,eh);ctx.fillStyle='#0c0c10';ctx.fillRect(X-12,Y-9,24,16);ctx.fillStyle='#2a2a30';ctx.fillRect(X+8,Y-6,12,10);ctx.fillStyle='#6ab0ff';ctx.beginPath();ctx.arc(X+20,Y-1,3.4,0,TAU);ctx.fill();
+ if((t*3|0)%2)lglow(X-10,Y-10,9,'rgba(255,40,40,.95)');ctx.lineCap='butt';}
+function wb94Village(x,w,t){iBox(x-30,x+30,w-14,w+14,0,34,'#2a2a30','#16161a','#1e1e24');for(let k=0;k<3;k++){const mx=x-22+k*20;iBox(mx-8,mx+8,w-12,w-8,34,48,'#111','#000','#0a0a0a');const X=ipx(mx,w-7.5),Y=ipy(mx,w-7.5,41);ctx.fillStyle=['#7ac0ff','#ffcf7a','#a0ffb0'][k];ctx.globalAlpha=.7+.3*Math.sin(t*5+k);ctx.fillRect(X-6,Y-4,12,7);ctx.globalAlpha=1;}
+ // 12x12 silk on two stands
+ const sx=x+90,sw=w+10;iBox(sx-2,sx+2,sw-2,sw+2,0,120,'#333','#222','#2a2a2a');iBox(sx+118,sx+122,sw-2,sw+2,0,120,'#333','#222','#2a2a2a');ctx.fillStyle='rgba(250,250,245,.55)';iPoly([[sx,sw,120],[sx+120,sw,120],[sx+120,sw-10,200],[sx,sw-10,200]]);ctx.fill();ctx.strokeStyle='#888';ctx.lineWidth=1.5;ctx.stroke();}
+function wb94Clapper(x,w,t){ctx.save();iPlane(x,w,70,IF);ctx.fillStyle='#111';ctx.fillRect(0,0,120,52);ctx.strokeStyle='#fff';ctx.lineWidth=1;ctx.strokeRect(2,14,116,36);
+ ctx.save();ctx.translate(2,14);ctx.rotate(-.22*Math.max(0,Math.sin(t*2)));for(let i=0;i<6;i++){ctx.fillStyle=i%2?'#fff':'#111';ctx.fillRect(i*20,-10,20,10);}ctx.restore();
+ ctx.fillStyle='#fff';ctx.font='900 9px '+UIF;ctx.fillText('PROD: "BURBANK NIGHTS"',6,26);ctx.fillText('SCENE 42',6,37);ctx.fillText('TAKE 1',66,37);ctx.fillText('CAM A  ·  ROLL 7',6,47);ctx.restore();}
+function wb94Ramp(x,w){// steel kicker ramp on the near sidewalk, pointing across the street (−w)
+ const a=w-90,b=w,h=44,x0=x-34,x1=x+34;ctx.fillStyle='#2e3238';iPoly([[x0,a,0],[x0,b,h],[x0,b,0]]);ctx.fill();ctx.fillStyle='#4a4e56';iPoly([[x0,a,0],[x1,a,0],[x1,b,h],[x0,b,h]]);ctx.fill();
+ ctx.fillStyle='#3a3e46';iPoly([[x0,b,0],[x1,b,0],[x1,b,h],[x0,b,h]]);ctx.fill();
+ for(let k=0;k<6;k++){const u0=k/6,u1=(k+.5)/6;ctx.fillStyle='#ffd23a';iPoly([[x0,a+(b-a)*u0,h*u0],[x0+10,a+(b-a)*u0,h*u0],[x0+10,a+(b-a)*u1,h*u1],[x0,a+(b-a)*u1,h*u1]]);ctx.fill();iPoly([[x1-10,a+(b-a)*u0,h*u0],[x1,a+(b-a)*u0,h*u0],[x1,a+(b-a)*u1,h*u1],[x1-10,a+(b-a)*u1,h*u1]]);ctx.fill();}
+ ctx.strokeStyle='rgba(255,255,255,.25)';ctx.lineWidth=1;ctx.beginPath();for(let k=1;k<10;k++){const u=k/10;ctx.moveTo(ipx(x0+10,a+(b-a)*u),ipy(x0+10,a+(b-a)*u,h*u));ctx.lineTo(ipx(x1-10,a+(b-a)*u),ipy(x1-10,a+(b-a)*u,h*u));}ctx.stroke();
+ // safety: cones + crash pads + fire extinguisher
+ for(let k=0;k<5;k++){const cx=x-80+k*40,cw=w-110;ctx.fillStyle='#ff7a1a';iPoly([[cx-5,cw-5,0],[cx+5,cw+5,0],[cx,cw,22]]);ctx.fill();}
+ iBox(x+60,x+120,w-80,w-30,0,16,'#1a4aa8','#123478','#163e90');iBox(x-130,x-110,w-60,w-52,0,22,'#c81818','#801010','#a01414');}
+function wb94CarSpr(){return isoSpr({type:'super',col:WB94.col,trailer:'',people:[]},IL,IF,'wb94');}
+function wb94DrawCar(x,w,h,pitch,a){const sp=wb94CarSpr(),m=MODELS.super,wd=iWD('super');const X=ipx(x-wd/2,w-m.L/2),Y=ipy(x-wd/2,w-m.L/2,h),cX=ipx(x,w),cY=ipy(x,w,h+m.H*.4);
+ ctx.save();ctx.globalAlpha=a;ctx.translate(cX,cY);ctx.rotate(pitch);ctx.translate(-cX,-cY);ctx.drawImage(sp.c,X-sp.ox,Y-sp.oy,sp.w,sp.h);
+ // racing stripe glint + headlamps pointing where it's going
+ if(a>.9){const hx=ipx(x,w+m.L/2),hy=ipy(x,w+m.L/2,h+18);glow(hx,hy,14,'rgba(255,250,230,.9)');}ctx.restore();}
+function wb94Heli(X,Y,t,sc,face,tilt){const rs=tacticalRotorSprite(t,Math.min(3,Math.max(1,Math.ceil(DPR*sc*1.4))),face);ctx.save();ctx.translate(X,Y);ctx.rotate(tilt);ctx.scale(face*sc,sc);ctx.drawImage(rs.c,rs.x0,rs.y0,rs.w,rs.h);ctx.restore();
+ // film-unit livery tag + nose camera ball + nav lights
+ ctx.save();ctx.translate(X,Y);ctx.rotate(tilt);ctx.fillStyle='#ffd23a';ctx.fillRect(-60*sc*face,-2*sc,26*sc*face,3*sc);
+ const on=(t*2|0)%2;glow(face*-70*sc,4*sc,on?10*sc:4*sc,'rgba(255,40,40,.95)');glow(face*60*sc,10*sc,6*sc,'rgba(60,255,120,.8)');ctx.restore();}
+// ---------- stunt state machine (replaces v93) ----------
+g93Set('lot','tick',function(s,dt,X){LOTt.call(this,s,dt,X);const W=X.wb;if(!W)return;const dx=W.x-s.x;
+ if(W.st==='wait'&&dx<WB94.roll&&dx>-200){W.st='roll';W.t=0;s.cars=s.cars.filter(c=>!(c.x+c.len>W.x-1100&&c.x<W.x+900));if(s.opp)s.opp=s.opp.filter(c=>!((c.abs?c.off:c.x)>W.x-1100&&(c.abs?c.off:c.x)<W.x+1100));s90Note('🎬 QUIET ON SET… ROLLING! SLOW DOWN FOR THE STUNT','#ffd23a',1.8);try{SFX.horn&&SFX.horn();}catch(e){}}
+ if(W.st==='roll'||W.st==='jump')s.v=Math.min(s.v,WB94.vcap);
+ if(W.st==='roll'){W.t+=dt;if(dx<WB94.go||W.t>5.5){W.st='jump';W.t=0;s.amG=Math.max(s.amG||0,WB94.J+1);try{SFX.crash&&SFX.crash();}catch(e){}
+   for(let i=0;i<40;i++)part(W.x+rnd(-30,30),44,rnd(-200,200),rnd(60,320),i%3?'#9a9086':'#ffcf6a',rnd(.3,.8),rnd(3,7));}}
+ else if(W.st==='jump'){W.t+=dt;s.amG=Math.max(s.amG||0,.5);const u=W.t/WB94.J,P=wb94Arc(u);
+  if(Math.random()<dt*60)part(W.x+rnd(-20,20),P.h+20,rnd(-40,40),rnd(-30,30),'rgba(120,116,110,1)',rnd(.4,.9),rnd(5,10));
+  if(W.t>=WB94.J){W.st='caught';W.t=0;s.shake=Math.max(s.shake||0,10);for(let i=0;i<46;i++)part(W.x+rnd(-40,40),WB94.h1+20,rnd(-260,260),rnd(-60,260),i%2?'#ffd060':'#ffffff',rnd(.2,.5),rnd(2,4));
+   s90Pts(WB94.pts,'🎬 CUT! PRINT IT — YOU\'RE IN THE SHOT +{p}','#ffd23a',{big:1});try{SFX.badLand&&SFX.badLand();}catch(e){}}}
+ else if(W.st==='caught'){W.t+=dt;if(W.t>WB94.away)W.st='done';}});
+// cinematic slow-mo during the jump (replace v93's factor)
+WB93.slow=WB94.slow;
+const UPD94wb=update;update=function(dt){return UPD94wb(dt);};
+// frame the helicopter: raise the camera during the stunt
+{const A93=A93cy;A93cy=function(){const s=state,d=S90d(),W=d&&d.key==='lot'&&s.s90&&s.s90.wb;if(W){W.cam=(W.cam||0)+(((W.st==='roll'||W.st==='jump'||W.st==='caught')?55:0)-(W.cam||0))*.04;return A93()+W.cam;}return A93();};}
+g93Set('lot','world',function(){LOTw&&LOTw.apply(this,arguments);const s=state,X=s.s90,W=X&&X.wb;if(!W)return;if(!k91Near(W.x,1300,2800))return;const t=s.time;
+ // far sidewalk film unit
+ wb94Crane(W.x-420,-150,t,W.st==='jump'||W.st==='caught'?.25:-.3+Math.sin(t*.4)*.2);wb94Village(W.x+300,-150,t);wb94Chair(W.x+230,-110);wb94Chair(W.x+256,-110);
+ wb94HMI(W.x-200,-170,1,t);wb94HMI(W.x+190,-170,-1,t);wb94Clapper(W.x+120,-120,t);
+ for(let k=0;k<8;k++)iPed(W.x-330+k*58+(k>3?300:0),-120+hr(k,5)*40,t*2+k,{c:k===3?'#c81818':k%2?'#14141a':'#3a3a40',p:'#2a2a30',s:'#d9a37e',h:'#222'},0,k===2?'cam':'');
+ // near sidewalk: ramp + safety crew
+ wb94Ramp(W.x,WB94.w0);for(let k=0;k<4;k++)iPed(W.x-140+k*90,WB94.w0-130+hr(k,8)*20,t*2+k,{c:k%2?'#ff7a1a':'#14141a',p:'#2a2a30',s:'#c98a64',h:'#222'},0,'');
+ if(W.st==='done')return;
+ // helicopter (over the far sidewalk) + cradle
+ let hh=WB94.hh+Math.sin(t*1.3)*6,hx=W.x+WB94.hx,hw=WB94.w1+10,tilt=Math.sin(t*.9)*.025,face=1;
+ if(W.st==='caught'){const u=W.t/WB94.away;hh+=u*u*520;hx+=u*u*900;hw+=-u*u*300;tilt=-.14*Math.min(1,u*3);}
+ const HX=ipx(hx,hw),HY=ipy(hx,hw,hh),sc=2.1;
+ // rotor downwash on the ground
+ {const gx=ipx(hx,hw),gy=ipy(hx,hw,0),k=clamp(1-(hh-WB94.hh)/400,0,1);if(k>0){ctx.save();ctx.globalAlpha=.5*k;const g=ctx.createRadialGradient(gx,gy,0,gx,gy,150);g.addColorStop(0,'rgba(20,18,16,.45)');g.addColorStop(.6,'rgba(200,190,170,.12)');g.addColorStop(1,'rgba(200,190,170,0)');ctx.fillStyle=g;ctx.translate(gx,gy);ctx.scale(1,.4);ctx.beginPath();ctx.arc(0,0,150,0,TAU);ctx.fill();ctx.restore();
+  if(Math.random()<.5)part(hx+rnd(-140,140),2,rnd(-200,200),rnd(10,60),'rgba(170,160,140,1)',rnd(.3,.6),rnd(3,6));}}
+ wb94Heli(HX,HY,t,sc,face,tilt);lglow(HX,HY+40,110,'rgba(255,250,220,.16)');
+ // cables + spreader bar + net cradle
+ const cbh=WB94.h1-6,cradle=[ipx(hx,hw),ipy(hx,hw,cbh+(W.st==='caught'?(hh-WB94.hh-Math.sin(t*1.3)*6):0))];const cX=ipx(hx,hw)+(HX-ipx(hx,hw))*0,cY=cradle[1];
+ ctx.strokeStyle='#c8ccd4';ctx.lineWidth=2.2;ctx.beginPath();ctx.moveTo(HX-6,HY+30*sc);ctx.lineTo(cX-70,cY-30);ctx.moveTo(HX+6,HY+30*sc);ctx.lineTo(cX+70,cY-30);ctx.stroke();
+ ctx.fillStyle='#ffd23a';ctx.fillRect(cX-80,cY-34,160,6);ctx.fillStyle='#14141a';for(let k=0;k<8;k++)ctx.fillRect(cX-80+k*20,cY-34,10,6);
+ // stunt car
+ const m=MODELS.super;
+ if(W.st==='wait'||W.st==='roll'){const sh=W.st==='roll'?Math.sin(t*40)*.6:0;wb94DrawCar(W.x,WB94.w0-150+sh,0,0,1);if(W.st==='roll'){const ex=ipx(W.x,WB94.w0-150-m.L/2-6),ey=ipy(W.x,WB94.w0-150-m.L/2-6,10);for(let i=0;i<3;i++){ctx.fillStyle='rgba(140,140,140,'+(.25-.07*i)+')';ctx.beginPath();ctx.arc(ex+i*10+Math.sin(t*9+i)*3,ey-i*8,8+i*5,0,TAU);ctx.fill();}}}
+ else if(W.st==='jump'){const u=Math.min(1,W.t/WB94.J);
+  const sp=wb94Arc(u);ctx.fillStyle='rgba(0,0,0,'+(.3*(1-sp.h/400)).toFixed(2)+')';ctx.beginPath();ctx.ellipse(ipx(W.x,sp.w),ipy(W.x,sp.w,0),56,16,-.5,0,TAU);ctx.fill();
+  for(const [du,al] of [[.09,.18],[.06,.28],[.03,.42]]){const q=wb94Arc(u-du);if(u-du>0)wb94DrawCar(W.x,q.w,q.h,q.p,al);}
+  wb94DrawCar(W.x,sp.w,sp.h,sp.p,1);
+  // speed lines
+  ctx.save();ctx.globalCompositeOperation='lighter';ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=1.5;const q=wb94Arc(Math.max(0,u-.12));ctx.beginPath();for(let i=-2;i<=2;i++){ctx.moveTo(ipx(W.x+i*14,q.w-40),ipy(W.x+i*14,q.w-40,q.h+30));ctx.lineTo(ipx(W.x+i*14,sp.w-90),ipy(W.x+i*14,sp.w-90,sp.h+30));}ctx.stroke();ctx.restore();}
+ else if(W.st==='caught'){const p=Math.sin(t*2.4)*.05;ctx.save();const dx2=cX-ipx(W.x,WB94.w1),dy2=cY-ipy(W.x,WB94.w1,WB94.h1);ctx.translate(dx2,dy2);wb94DrawCar(W.x,WB94.w1,WB94.h1,p,1);ctx.restore();}
+
+ ctx.strokeStyle='rgba(30,30,34,.9)';ctx.lineWidth=1.4;ctx.beginPath();for(let k=0;k<=8;k++){const xx=cX-78+k*19.5;ctx.moveTo(xx,cY-28);ctx.quadraticCurveTo(xx+(cX-xx)*.15,cY+8,cX-60+k*15,cY+18);}ctx.moveTo(cX-78,cY-6);ctx.quadraticCurveTo(cX,cY+30,cX+78,cY-6);ctx.moveTo(cX-70,cY+8);ctx.quadraticCurveTo(cX,cY+34,cX+70,cY+8);ctx.stroke();
+ if(W.st==='jump'){s90Screen((w,h)=>{const k=Math.min(1,W.t/.25)*Math.min(1,(WB94.J-W.t)/.25+.0001);ctx.fillStyle='rgba(0,0,0,'+(.88*k).toFixed(2)+')';ctx.fillRect(0,0,w,h*.085);ctx.fillRect(0,h*.915,w,h*.085);ctx.globalAlpha=k;ctx.fillStyle='#ffd23a';ctx.font='900 14px '+UIF;ctx.textAlign='left';ctx.fillText('● REC  SCENE 42 · TAKE 1',16,h*.055);ctx.textAlign='right';ctx.fillText('🎬 ACTION!',w-16,h*.055);ctx.globalAlpha=1;});}});
+{const LI94=SUBFX.lot.init;g93Set('lot','init',function(s,d){LI94.call(this,s,d);const W=s.s90&&s.s90.wb;let k=0;
+ for(const b of s.blds){if(b.sp==='ffront93'&&W&&Math.abs((b.x0+b.x1)/2-W.x)<2600){b.sp='nyc94';b.k94=k++;b.h=Math.max(170,Math.min(250,b.h+40));}}
+ // keep the crossing clear of traffic in the near lanes for the shot
+ if(W)s.cars=s.cars.filter(c=>!(c.x+c.len>W.x-420&&c.x<W.x+320));});}
+
+// cinematic camera: ease the view so the whole stunt (ramp → arc → helicopter) sits mid-frame
+function CX94(){const s=state,d=S90d(),W=d&&d.key==='lot'&&s.s90&&s.s90.wb;if(!W)return 0;const on=W.st==='roll'||W.st==='jump'||(W.st==='caught'&&W.t<2);
+ const tg=on?clamp((W.x-s.x)*IF[0]+110*IL[0]-WB94.camX,0,WB94.camMax):0;W.cx=(W.cx||0)+(tg-(W.cx||0))*.05;return W.cx;}
 
 </script></body></html>
