@@ -706,7 +706,7 @@ for(const k in LVLS){const L=LVLS[k],f=v=>Math.round(v*LK);L.len0=L.len;L.time0=
 // v22: play order (internal level ids stay stable: 1-6 freeway, 7 K-Town, 8 DTLA, 9 Beverly Hills); progress = unlocked positions
 const ORDER=[1,2,7,3,8,4,9,5,6,12,10],NLV=11,POS=k=>{const i=ORDER.indexOf(k);return i>=0?i+1:k===11?ORDER.indexOf(6)+1:0;},KAT=p=>ORDER[clamp(p,1,NLV)-1];
 let SEL=1,UNL=1;try{const v3=localStorage.getItem('r405_unl93'),v=localStorage.getItem('r405_unl9');if(v3!=null)UNL=clamp(+v3||1,1,NLV);else if(v!=null){const o=+v||1;UNL=clamp(o>10?o-1:o,1,NLV);localStorage.setItem('r405_unl93',UNL);}else{const old=Math.max(1,Math.min(6,+localStorage.getItem('r405_unlocked')||1));let m=1;for(let k=1;k<=old;k++)m=Math.max(m,POS(k));UNL=m;localStorage.setItem('r405_unl93',UNL);}}catch(e){}
-const BUILD='v94',TEST_BUILD=true;UNL=NLV; // v50: every level open for everyone
+const BUILD='v94b',TEST_BUILD=true;UNL=NLV; // v50: every level open for everyone
 {const m=/[?&]level=(\d+)/.exec(location.search);if(m){const n=+m[1];if(LVLS[n])setTimeout(()=>{if(state.mode=='title'){SEL=POS(n);startLevel(n,LVLS[n].subs?+(new URLSearchParams(location.search).get('sub')||1):undefined);}},60);}}
 function unlock(p){UNL=Math.min(NLV,Math.max(UNL,p));try{localStorage.setItem('r405_unl93',UNL);}catch(e){}}
 function GH(x){if(LV==3)return (48*Math.sin(x/1150)+26*Math.sin(x/430+1.3))*(x<1200?x/1200:1);const H=LVLS[LV].hills;return H?hillH(x,H):0;}
@@ -2332,7 +2332,7 @@ function isoGround(xmin,xmax,vw){const s=state,t=s.time,T=TH();
  hwyLights(xmin,xmax);isoGroundTail(xmin,xmax,vw);ctx.restore();}
 function isoGroundTail(xmin,xmax,vw){const s=state;let g;
  {const fx=LEVEL+60;if(!XLV()&&fx>xmin&&fx<xmax)for(let r=0;r<12;r++)for(let c=0;c<2;c++){ctx.fillStyle=(r+c)%2?'#111':'#fff';iQuad(fx+c*12,fx+c*12+12,IRD0+r*(IRD1-IRD0)/12,IRD0+(r+1)*(IRD1-IRD0)/12,0);ctx.fill();}}
- if(!s.air&&!s.lx){ctx.save();ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(220,235,255,'+(NIGHT>0?.14:.07)+')';iPoly([[s.x+128,s.lw-26,0],[s.x+360,s.lw-46,0],[s.x+360,s.lw+46,0],[s.x+128,s.lw+26,0]]);ctx.fill();ctx.restore();}
+ if(false){ctx.save();ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(220,235,255,'+(NIGHT>0?.14:.07)+')';iPoly([[s.x+128,s.lw-26,0],[s.x+360,s.lw-46,0],[s.x+360,s.lw+46,0],[s.x+128,s.lw+26,0]]);ctx.fill();ctx.restore();}
  lxShift(0,lxPH(),isoShadowP);
  if(s.rings)for(const r of s.rings){ctx.strokeStyle='rgba(215,242,252,'+(r.l*.6)+')';ctx.lineWidth=5*r.l+1;ctx.beginPath();for(let i=0;i<=24;i++){const a=i/24*TAU,x=r.x+Math.cos(a)*r.r,w=(r.w??s.lw)+Math.sin(a)*r.r*.8;i?ctx.lineTo(ipx(x,w),ipy(x,w,0)):ctx.moveTo(ipx(x,w),ipy(x,w,0));}ctx.stroke();}
  const hc=hazeC();g=ctx.createLinearGradient(0,IO.hz,0,IO.hz+190);g.addColorStop(0,'rgba('+hc+',.9)');g.addColorStop(.5,'rgba('+hc+',.35)');g.addColorStop(1,'rgba('+hc+',0)');ctx.fillStyle=g;ctx.fillRect(-400,IO.hz,vw+800,190);}
@@ -7168,7 +7168,7 @@ function d89Air(){const f=state.f86,t=state.time,r=D89.r,zx=D89.zx,sp=d89Sprite(
   // nav LEDs + strobe + gimbal lens
   const bl=(t*2+i)%1<.5;ctx.fillStyle='#ff4a3a';ctx.fillRect(X+(-52*IF[0]+52*IL[0])*k-3,Y+(-52*IF[1]+52*IL[1])*k-8,6,5);ctx.fillStyle='#4dff9a';ctx.fillRect(X+(52*IF[0]-52*IL[0])*k-3,Y+(52*IF[1]-52*IL[1])*k-8,6,5);if(bl){ctx.fillStyle='#ffffff';ctx.fillRect(X-3,Y-20,6,5);glow(X,Y-18,18,'rgba(255,255,255,.8)');}
   ctx.fillStyle=hot?'#ff5a3c':'#7dfff0';ctx.beginPath();ctx.arc(X+1,Y+17.5*k,3.6,0,TAU);ctx.fill();
-  ctx.font='900 21px '+UIF;ctx.textAlign='center';ctx.textBaseline='middle';const tg=hot?'SCANNING':'SECURITY DRONE',tw=ctx.measureText(tg).width+22;ctx.fillStyle=hot?'rgba(120,20,10,.85)':'rgba(6,30,34,.82)';rrp(X-tw/2,Y-60*k-6,tw,28,9);ctx.fill();ctx.fillStyle=hot?'#ffb08a':'#8ffcf0';ctx.fillText(tg,X,Y-60*k+8.5);ctx.textBaseline='alphabetic';});}
+  ctx.font='900 21px '+UIF;ctx.textAlign='center';ctx.textBaseline='middle';const tg=hot?'SCANNING':'SECURITY DRONE',tw=ctx.measureText(tg).width+22;ctx.fillStyle=hot?'rgba(120,20,10,.85)':'rgba(6,30,34,.82)';const tm=ctx.getTransform(),LX=Math.abs(tm.a)>1e-6?clamp(X,(100*DPR-tm.e-tm.c*Y)/tm.a+tw/2,(cv.width-10*DPR-tm.e-tm.c*Y)/tm.a-tw/2):X;rrp(LX-tw/2,Y-60*k-6,tw,28,9);ctx.fill();ctx.fillStyle=hot?'#ffb08a':'#8ffcf0';ctx.fillText(tg,LX,Y-60*k+8.5);ctx.textBaseline='alphabetic';});}
 
 // --- shuttle / bus side labels: flush on the near body face (same plane + offsets as the iso body sprite), left-aligned, fitted ---
 const L89=new Map();
@@ -9255,5 +9255,22 @@ g93Set('lot','world',function(){LOTw&&LOTw.apply(this,arguments);const s=state,X
 // cinematic camera: ease the view so the whole stunt (ramp → arc → helicopter) sits mid-frame
 function CX94(){const s=state,d=S90d(),W=d&&d.key==='lot'&&s.s90&&s.s90.wb;if(!W)return 0;const on=W.st==='roll'||W.st==='jump'||(W.st==='caught'&&W.t<2);
  const tg=on?clamp((W.x-s.x)*IF[0]+110*IL[0]-WB94.camX,0,WB94.camMax):0;W.cx=(W.cx||0)+(tg-(W.cx||0))*.05;return W.cx;}
+
+
+// ===== v95 · Race to LAX planes =====
+// What was wrong: the landing jets were screen-space HUD overlays (sub85Jet + lax84JetOverlay) — two copies of the
+// same jet drawn at fixed screen spots ON TOP of the world: the jet flew tail-first (nose right, moving left),
+// popped in/out mid-screen (q cut at .1/.9), a 55% copy sat under the top HUD bar, and when the car jumped the jet
+// was painted over the hero car. Now: one jet, nose-first, drawn in the world pass behind the traffic/hero car,
+// entering and leaving fully off-screen, in the sky band below the HUD.
+sub85Jet=function(){};lax84JetOverlay=function(){};
+function lax95JetOn(){const s=state;if(LV!==1||!s||(s.lx&&s.lx.sc>0)||!['intro','play'].includes(s.mode))return false;return (s.sub85&&sub85N()===3)||s.x>26100;}
+function lax95Jet(){const s=state,q=(s.time*.075)%1,sp=lax84Jet(),vw=W/S,k=.52,hudB=96/S,x=vw*(-.32+1.64*q),y=hudB+sp.oy*k+6+q*18;
+ ctx.save();ctx.setTransform(DPR*S,0,0,DPR*S,0,0);ctx.translate(x,y);ctx.rotate(.045);
+ ctx.globalAlpha=.16;ctx.fillStyle='#0a0618';ctx.beginPath();ctx.ellipse(-10,sp.oy*k*1.9,sp.w*k*.34,9,-.24,0,TAU);ctx.fill();ctx.globalAlpha=1; // soft haze shadow under the jet
+ ctx.drawImage(sp.c,-sp.ox*k,-sp.oy*k,sp.w*k,sp.h*k);
+ if(((s.time*1.6)|0)%2===0){lglow((sp.w-sp.ox)*k*.93,-sp.oy*k*.3,14,'rgba(255,250,220,.75)');}
+ ctx.restore();}
+{const SC=LAX84hooks.scenery;LAX84hooks.scenery=function(xmin,xmax){const R=SC(xmin,xmax);try{if(lax95JetOn()&&R&&R[0])R[0].push({x:state.x,w:1e6,ly:1e6,f:lax95Jet});}catch(e){}return R;};}
 
 </script></body></html>
