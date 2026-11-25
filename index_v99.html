@@ -10829,6 +10829,9 @@ function abutment99(s,dir){
 }
 
 function bent99(s,T,W,cf){
+ // Caps stay under the slab and local to each shaft (or a short beam
+ // between two nearby shafts). Never span the whole deck width — that
+ // painted a diagonal crossbeam across the roadway in later draw passes.
  const top=s.h-T;
  if(top<36)return;
  const cols=(W&&W.length)?W:[s.c];
@@ -10839,14 +10842,21 @@ function bent99(s,T,W,cf){
   iBox(s.x-15,s.x+15,w-14,w+14,12,top-16,C.colHi,C.colDk,C.col);
   ctx.fillStyle='rgba(0,0,0,.14)';
   for(let h=24;h<top-20;h+=22){if(typeof iFaceW==='function'){iFaceW(w+14.2,s.x-15,s.x+15,h,h+3);ctx.fill();}}
+  // local hammerhead, flush with the underside (s.h-T), not the deck top
+  const cw0=w-32,cw1=w+32;
+  iBox(s.x-26,s.x+26,cw0,cw1,top-16,top,C.cap,C.capDk,C.colHi);
+  ctx.fillStyle='rgba(36,32,28,.38)';
+  iPoly([[s.x-26,cw0,top-16],[s.x+26,cw0,top-16],[s.x+26,cw1,top-16],[s.x-26,cw1,top-16]]);ctx.fill();
  }
- const w0=Math.min(...use,s.c-s.hw+10)-16;
- const w1=Math.max(...use,s.c+s.hw-10)+16;
- iBox(s.x-26,s.x+26,w0,w1,top-16,top,C.cap,C.capDk,C.colHi);
- ctx.fillStyle='rgba(36,32,28,.38)';
- iPoly([[s.x-26,w0,top-16],[s.x+26,w0,top-16],[s.x+26,w1,top-16],[s.x-26,w1,top-16]]);ctx.fill();
- ctx.fillStyle='rgba(0,0,0,.16)';
- iPoly([[s.x-26,w0,top-16],[s.x+26,w0,top-16],[s.x+26,w0,top-13],[s.x-26,w0,top-13]]);ctx.fill();
+ // If two shafts are close, a short under-deck beam between them only
+ if(use.length>=2){
+  const ws=use.slice().sort((a,b)=>a-b);
+  for(let i=0;i<ws.length-1;i++){
+   if(ws[i+1]-ws[i]>140)continue;
+   const a=ws[i]+28,b=ws[i+1]-28;if(b<=a)continue;
+   iBox(s.x-22,s.x+22,a,b,top-14,top,C.cap,C.capDk,C.colHi);
+  }
+ }
 }
 
 function poles99(S,PH){
@@ -10870,34 +10880,48 @@ function poles99(S,PH){
 }
 
 function cars99(S){
- if(S.length<3||typeof isoCarSpr!=='function')return;
+ // Same iso sprites / blit anchors / scale as freeway traffic. Pick the
+ // heading (along ±x or ±w) from the ribbon tangent — never ctx.rotate.
+ if(S.length<3||typeof isoCarSpr!=='function'||typeof MODELS==='undefined')return;
  const t=(typeof state!=='undefined'&&state.time)||0;
  const seed=Math.round((S[0].x||0)*0.13);
- const n=S[0].hw>100?4:S[0].hw>60?3:2;
+ const twoWay=S[0].hw>80;
+ const n=S[0].hw>100?3:2;
  const types=['ev','hatch','cross','suv3','pickup','minivan','hatch','ev'];
  const cols=['#c8ccd0','#2a2e34','#d8a848','#3c6a9a','#8a3030','#e8e4dc','#4a5560','#c4783a'];
  ctx.save();ctx.globalAlpha=1;
  for(let k=0;k<n;k++){
-  const dir=k%2===0?1:-1;
-  let u=(t*(0.035+hr(seed+k,3)*0.02)*dir+hr(seed,k+2)+k*0.27)%1;
+  const dir=twoWay&&(k%2)?-1:1; // one-way ramps all travel +u (toward grade)
+  let u=(t*(0.035+hr(seed+k,3)*0.02)*dir+hr(seed,k+2)+k*0.31)%1;
   if(u<0)u+=1;
-  if(u<0.07||u>0.93)continue;
+  if(u<0.08||u>0.92)continue;
   const s=lerpS(S,u);
   if(s.h<32)continue;
-  const lane=((k%2)?-1:1)*(Math.min(s.hw-22,36+hr(seed,k+5)*16));
+  const nxt=lerpS(S,clamp(u+0.05*dir,0.02,0.98));
+  const dx=nxt.x-s.x, dw=nxt.c-s.c;
+  const lane=((k%2)?-1:1)*(Math.min(s.hw-28,34+hr(seed,k+5)*12));
   const w=s.c+lane;
-  const c={type:types[(seed+k)%types.length],col:cols[(seed+k*3)%cols.length],trailer:0};
+  const type=types[(seed+k)%types.length];
+  const c={type,col:cols[(seed+k*3)%cols.length],trailer:0};
   try{
-   const sp=isoCarSpr(c);
-   const X=ipx(s.x,w),Y=ipy(s.x,w,s.h+1);
-   const nxt=lerpS(S,clamp(u+0.02*dir,0.02,0.98));
-   const ang=Math.atan2(ipy(nxt.x,nxt.c,nxt.h)-Y,ipx(nxt.x,nxt.c)-X);
-   const base=Math.atan2(ipy(s.x+40,w,s.h)-Y,ipx(s.x+40,w)-X);
-   ctx.save();
-   ctx.translate(X,Y);
-   ctx.rotate(ang-base);
-   ctx.drawImage(sp.c,-sp.ox,-sp.oy,sp.w,sp.h);
-   ctx.restore();
+   const m=MODELS[type],ml=m.L,wd=typeof iWD==='function'?iWD(type):60;
+   // shadow on the deck, same recipe as isoTraffic
+   ctx.fillStyle='rgba(0,0,0,.28)';
+   if(Math.abs(dx)>=Math.abs(dw)){
+    const sp=dx>=0?isoCarSpr(c):isoOppSpr(c);
+    const bx=dx>=0?s.x-ml/2:s.x+ml/2;
+    iPoly([[bx,w-wd/2,s.h],[bx+ (dx>=0?ml:-ml),w-wd/2,s.h],[bx+(dx>=0?ml:-ml),w+wd/2,s.h],[bx,w+wd/2,s.h]]);ctx.fill();
+    const X=ipx(bx,w+wd/2),Y=ipy(bx,w+wd/2,s.h);
+    ctx.drawImage(sp.c,X-sp.ox,Y-sp.oy,sp.w,sp.h);
+   }else if(typeof isoDeckSpr==='function'){
+    const d=dw>=0?1:-1;
+    const sp=isoDeckSpr(c,d);
+    const wr=d>0?w-ml/2:w+ml/2;
+    const lx=s.x;
+    iPoly([[lx-wd/2,wr,s.h],[lx+wd/2,wr,s.h],[lx+wd/2,wr+(d>0?ml:-ml),s.h],[lx-wd/2,wr+(d>0?ml:-ml),s.h]]);ctx.fill();
+    const X=ipx(lx-wd/2,wr),Y=ipy(lx-wd/2,wr,s.h);
+    ctx.drawImage(sp.c,X-sp.ox,Y-sp.oy,sp.w,sp.h);
+   }
   }catch(e){}
  }
  ctx.restore();
