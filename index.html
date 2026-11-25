@@ -706,7 +706,7 @@ for(const k in LVLS){const L=LVLS[k],f=v=>Math.round(v*LK);L.len0=L.len;L.time0=
 // v22: play order (internal level ids stay stable: 1-6 freeway, 7 K-Town, 8 DTLA, 9 Beverly Hills); progress = unlocked positions
 const ORDER=[1,2,7,3,8,4,9,5,6,12,10],NLV=11,POS=k=>{const i=ORDER.indexOf(k);return i>=0?i+1:k===11?ORDER.indexOf(6)+1:0;},KAT=p=>ORDER[clamp(p,1,NLV)-1];
 let SEL=1,UNL=1;try{const v3=localStorage.getItem('r405_unl93'),v=localStorage.getItem('r405_unl9');if(v3!=null)UNL=clamp(+v3||1,1,NLV);else if(v!=null){const o=+v||1;UNL=clamp(o>10?o-1:o,1,NLV);localStorage.setItem('r405_unl93',UNL);}else{const old=Math.max(1,Math.min(6,+localStorage.getItem('r405_unlocked')||1));let m=1;for(let k=1;k<=old;k++)m=Math.max(m,POS(k));UNL=m;localStorage.setItem('r405_unl93',UNL);}}catch(e){}
-const BUILD='v99',TEST_BUILD=true;UNL=NLV; // v50: every level open for everyone
+const BUILD='v100',TEST_BUILD=true;UNL=NLV; // v50: every level open for everyone
 {const m=/[?&]level=(\d+)/.exec(location.search);if(m){const n=+m[1];if(LVLS[n])setTimeout(()=>{if(state.mode=='title'){SEL=POS(n);startLevel(n,LVLS[n].subs?+(new URLSearchParams(location.search).get('sub')||1):undefined);}},60);}}
 function unlock(p){UNL=Math.min(NLV,Math.max(UNL,p));try{localStorage.setItem('r405_unl93',UNL);}catch(e){}}
 function GH(x){if(LV==3)return (48*Math.sin(x/1150)+26*Math.sin(x/430+1.3))*(x<1200?x/1200:1);const H=LVLS[LV].hills;return H?hillH(x,H):0;}
@@ -10190,12 +10190,17 @@ const CACHE=new Map(); // still+cloud canvases, evict aggressively for mobile
 function hr(i,s){const x=Math.sin(i*127.1+(s||0)*311.7)*43758.5453;return x-Math.floor(x);}
 function clamp(a,b,c){return a<b?b:a>c?c:a;}
 function cv(id,w,h,fn){
+ // Cap backing-store size so a high devicePixelRatio phone cannot allocate
+ // huge offscreen canvases. Keys stay at the capped integer size.
+ w=Math.max(64,Math.min(1024,w|0));h=Math.max(64,Math.min(512,h|0));
  const key=id+':'+w+'x'+h;
  let c=CACHE.get(key);if(c){CACHE.delete(key);CACHE.set(key,c);return c;}
  c=document.createElement('canvas');c.width=w;c.height=h;
  const o=c.getContext('2d');o.imageSmoothingEnabled=true;fn(o,w,h);
  CACHE.set(key,c);
- while(CACHE.size>8)CACHE.delete(CACHE.keys().next().value);
+ // Keep enough entries that the live still+cloud pair is never evicted
+ // (16 = 8 themes × 2 layers). LRU evicts the oldest unused theme only.
+ while(CACHE.size>16)CACHE.delete(CACHE.keys().next().value);
  return c;
 }
 function fillGrad(o,x,y,w,h,stops,horiz){
@@ -10755,10 +10760,10 @@ window.FJ98draw=bg98Draw;
 window.FJ98={draw:bg98Draw,theme:themeId,hz:HZ98,hook:hookScenery};
 })();
 
-// ===== v99 · finished b89 decks & flyovers on 1-1 / 1-2 / 1-3 =====
-// Opaque elevated ribbons: concrete fascia slab, parapets with a top rail,
-// white edge lines + dashed lanes, light poles, asphalt seams, hammerhead
-// bents, soft shadows, cosmetic (non-colliding) traffic, grade abutments.
+// ===== v100 · freeze fix + finished decks without mid-air cuts =====
+// No cosmetic ramp traffic. Full geom (no camera-window clip cuts).
+// Ends land at grade with an abutment, or the ribbon continues offscreen.
+// Cheaper per-frame deck draw: reuse buffers, LOD, cull offscreen detail.
 (function(){
 const TAU=Math.PI*2;
 const C={
@@ -10769,12 +10774,56 @@ const C={
  col:'#c9c3b6', colDk:'#8e887c', colHi:'#ddd8cc',
  cap:'#d8d2c6', capDk:'#9a9488', wall:'#b3ad9c', wallDk:'#8a8478'
 };
+const SEEN={deck:0};
 function clamp(a,b,c){return a<b?b:a>c?c:a;}
 function hr(i,s){const x=Math.sin(i*127.1+(s||0)*311.7)*43758.5453;return x-Math.floor(x);}
 function lerpS(S,u){
  const t=u*(S.length-1),i=Math.min(S.length-2,Math.max(0,Math.floor(t))),f=t-i,a=S[i],b=S[i+1];
  return {x:a.x+(b.x-a.x)*f,c:a.c+(b.c-a.c)*f,hw:a.hw+(b.hw-a.hw)*f,h:a.h+(b.h-a.h)*f};
 }
+function onceErr(tag,e){
+ try{
+  const seen=window.FJ100seen||(window.FJ100seen={});
+  if(seen[tag])return;
+  seen[tag]=1;
+  const msg=tag+': '+(e&&(e.message||e.stack)||e);
+  console.warn('[FJ100]',msg);
+  (window.FJERR92||(window.FJERR92=[])).push(msg);
+ }catch(_e){}
+}
+function vw100(){return (typeof W==='number'&&typeof S==='number'&&S)?W/S:2000;}
+function vh100(){return (typeof H==='number'&&typeof S==='number'&&S)?H/S:1200;}
+function seen100(x,w,h){
+ const X=ipx(x,w),Y=ipy(x,w,h);
+ return X>-220&&X<vw100()+220&&Y>-220&&Y<vh100()+220;
+}
+function structVis(S,lo,hi){
+ if(!S||S.length<2)return false;
+ if(lo!=null&&hi!=null){
+  const a=Math.min(lo,hi)-900,b=Math.max(lo,hi)+900;
+  let x0=S[0].x,x1=S[0].x;
+  for(let i=1;i<S.length;i++){const x=S[i].x;if(x<x0)x0=x;if(x>x1)x1=x;}
+  if(x1<a||x0>b){
+   // still draw if any sample projects on-screen (iso diagonal)
+   for(let i=0;i<S.length;i+=2){const s=S[i];if(seen100(s.x,s.c,s.h)||seen100(s.x,s.c-s.hw,s.h)||seen100(s.x,s.c+s.hw,s.h))return true;}
+   return false;
+  }
+ }
+ return true;
+}
+function lod100(S){
+ const mid=S[S.length>>1];
+ const z=(typeof state!=='undefined'&&state.zoom)||1;
+ if(mid.c<-520||mid.h<28||z<0.72)return 2;
+ let on=0;
+ for(let i=0;i<S.length;i+=3){if(seen100(S[i].x,S[i].c,S[i].h))on++;}
+ if(on<=1)return 2;
+ return 1;
+}
+
+// Reused path buffers — no per-frame array growth
+const B={far:[],near:[],farB:[],nearB:[],farT:[],nearT:[],farR:[],nearR:[],cen:[],shadeA:[],shadeB:[]};
+function clr(a){a.length=0;return a;}
 function strip(A,B){
  if(typeof b89Strip==='function')return b89Strip(A,B);
  ctx.beginPath();
@@ -10789,18 +10838,42 @@ function line(A,dw,dh){
  for(let i=0;i<A.length;i++){const X=ipx(A[i][0],A[i][1]+dw),Y=ipy(A[i][0],A[i][1]+dw,A[i][2]+dh);i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);}
  ctx.stroke();
 }
+function sm100(u){u=u<0?0:u>1?1:u;return typeof b89S==='function'?b89S(u):u*u*(3-2*u);}
+
+function landEnds100(S){
+ // Descend a high end to grade along +x/-x (constant c, no sideways spaghetti).
+ // Mutate once; cached geoms keep the landing.
+ if(!S||S.length<2||S._landed)return S;
+ const LAND=560,STEPS=8;
+ function land(end){
+  const a=end<0?S[0]:S[S.length-1];
+  const b=end<0?S[1]:S[S.length-2];
+  if(a.h<22)return;
+  const sign=Math.sign(a.x-b.x)||(end<0?-1:1);
+  const pts=[];
+  for(let k=1;k<=STEPS;k++){
+   const u=k/STEPS,e=sm100(u);
+   pts.push({x:a.x+sign*LAND*u,c:a.c,hw:Math.max(36,a.hw),h:a.h*(1-e)});
+  }
+  if(end<0){for(let k=pts.length-1;k>=0;k--)S.unshift(pts[k]);}
+  else{for(let k=0;k<pts.length;k++)S.push(pts[k]);}
+ }
+ land(-1);land(1);
+ S._landed=1;
+ return S;
+}
 
 function shadow99(S){
- const A=[],B=[];
+ const A=clr(B.shadeA),C=clr(B.shadeB);
  for(const s of S){
   if(s.h<8)continue;
   const k=s.h*.48;
   A.push([s.x+k*.32,s.c-s.hw+k*.85,0]);
-  B.push([s.x+k*.32,s.c+s.hw+k*.85,0]);
+  C.push([s.x+k*.32,s.c+s.hw+k*.85,0]);
  }
  if(A.length<2)return;
  ctx.fillStyle='rgba(20,22,30,.26)';
- strip(A,B);
+ strip(A,C);
 }
 
 function abutment99(s,dir){
@@ -10819,7 +10892,6 @@ function abutment99(s,dir){
  ctx.moveTo(ipx(x,c+hw-8),ipy(x,c+hw-8,.6));
  ctx.lineTo(ipx(x+dir*L,c+hw-8),ipy(x+dir*L,c+hw-8,.6));
  ctx.stroke();
- // wing walls sloping away from the span
  ctx.fillStyle=C.wall;
  iPoly([[x-14,c+hw,28],[x+14,c+hw,28],[x+14,c+hw+86,8],[x-14,c+hw+86,8]]);ctx.fill();
  iPoly([[x-14,c-hw,28],[x+14,c-hw,28],[x+14,c-hw-86,8],[x-14,c-hw-86,8]]);ctx.fill();
@@ -10828,27 +10900,26 @@ function abutment99(s,dir){
  iBox(x-22,x+22,c-hw-18,c+hw+18,0,28,C.cap,C.capDk,C.wall);
 }
 
-function bent99(s,T,W,cf){
- // Caps stay under the slab and local to each shaft (or a short beam
- // between two nearby shafts). Never span the whole deck width — that
- // painted a diagonal crossbeam across the roadway in later draw passes.
+function bent99(s,T,W,cf,lod){
  const top=s.h-T;
  if(top<36)return;
+ if(!seen100(s.x,s.c,s.h*0.5))return;
  const cols=(W&&W.length)?W:[s.c];
  const use=cols.filter(w=>!cf||cf(w));
  if(!use.length)return;
  for(const w of use){
   iBox(s.x-20,s.x+20,w-18,w+18,0,12,C.cap,C.colDk,C.col);
   iBox(s.x-15,s.x+15,w-14,w+14,12,top-16,C.colHi,C.colDk,C.col);
-  ctx.fillStyle='rgba(0,0,0,.14)';
-  for(let h=24;h<top-20;h+=22){if(typeof iFaceW==='function'){iFaceW(w+14.2,s.x-15,s.x+15,h,h+3);ctx.fill();}}
-  // local hammerhead, flush with the underside (s.h-T), not the deck top
+  // skip the per-shaft groove loop (many iFaceW calls) on LOD
+  if(lod<2){
+   ctx.fillStyle='rgba(0,0,0,.14)';
+   if(typeof iFaceW==='function'){iFaceW(w+14.2,s.x-15,s.x+15,top*0.45,top*0.45+3);ctx.fill();}
+  }
   const cw0=w-32,cw1=w+32;
   iBox(s.x-26,s.x+26,cw0,cw1,top-16,top,C.cap,C.capDk,C.colHi);
   ctx.fillStyle='rgba(36,32,28,.38)';
   iPoly([[s.x-26,cw0,top-16],[s.x+26,cw0,top-16],[s.x+26,cw1,top-16],[s.x-26,cw1,top-16]]);ctx.fill();
  }
- // If two shafts are close, a short under-deck beam between them only
  if(use.length>=2){
   const ws=use.slice().sort((a,b)=>a-b);
   for(let i=0;i<ws.length-1;i++){
@@ -10859,11 +10930,14 @@ function bent99(s,T,W,cf){
  }
 }
 
-function poles99(S,PH){
+function poles99(S,PH,lod){
+ if(lod>=2)return;
  if(typeof lglow!=='function')return;
- for(let i=2;i<S.length-2;i+=3){
+ const step=3;
+ for(let i=2;i<S.length-2;i+=step){
   const s=S[i];
   if(s.h<36)continue;
+  if(!seen100(s.x,s.c,s.h+PH))continue;
   const side=(i%6===2)?1:-1;
   const w=s.c+side*(s.hw-5);
   const X=ipx(s.x,w),Y=ipy(s.x,w,s.h+PH);
@@ -10875,68 +10949,27 @@ function poles99(S,PH){
   ctx.stroke();
   ctx.fillStyle='#d8c898';
   ctx.beginPath();ctx.arc(X-side*10,Y-43,2.6,0,TAU);ctx.fill();
-  lglow(X-side*10,Y-43,18,'rgba(255,214,150,.62)');
+  if(typeof GLOW==='undefined'||GLOW)lglow(X-side*10,Y-43,18,'rgba(255,214,150,.62)');
  }
 }
 
-function cars99(S){
- // Same iso sprites / blit anchors / scale as freeway traffic. Pick the
- // heading (along ±x or ±w) from the ribbon tangent — never ctx.rotate.
- if(S.length<3||typeof isoCarSpr!=='function'||typeof MODELS==='undefined')return;
- const t=(typeof state!=='undefined'&&state.time)||0;
- const seed=Math.round((S[0].x||0)*0.13);
- const twoWay=S[0].hw>80;
- const n=S[0].hw>100?3:2;
- const types=['ev','hatch','cross','suv3','pickup','minivan','hatch','ev'];
- const cols=['#c8ccd0','#2a2e34','#d8a848','#3c6a9a','#8a3030','#e8e4dc','#4a5560','#c4783a'];
- ctx.save();ctx.globalAlpha=1;
- for(let k=0;k<n;k++){
-  const dir=twoWay&&(k%2)?-1:1; // one-way ramps all travel +u (toward grade)
-  let u=(t*(0.035+hr(seed+k,3)*0.02)*dir+hr(seed,k+2)+k*0.31)%1;
-  if(u<0)u+=1;
-  if(u<0.08||u>0.92)continue;
-  const s=lerpS(S,u);
-  if(s.h<32)continue;
-  const nxt=lerpS(S,clamp(u+0.05*dir,0.02,0.98));
-  const dx=nxt.x-s.x, dw=nxt.c-s.c;
-  const lane=((k%2)?-1:1)*(Math.min(s.hw-28,34+hr(seed,k+5)*12));
-  const w=s.c+lane;
-  const type=types[(seed+k)%types.length];
-  const c={type,col:cols[(seed+k*3)%cols.length],trailer:0};
-  try{
-   const m=MODELS[type],ml=m.L,wd=typeof iWD==='function'?iWD(type):60;
-   // shadow on the deck, same recipe as isoTraffic
-   ctx.fillStyle='rgba(0,0,0,.28)';
-   if(Math.abs(dx)>=Math.abs(dw)){
-    const sp=dx>=0?isoCarSpr(c):isoOppSpr(c);
-    const bx=dx>=0?s.x-ml/2:s.x+ml/2;
-    iPoly([[bx,w-wd/2,s.h],[bx+ (dx>=0?ml:-ml),w-wd/2,s.h],[bx+(dx>=0?ml:-ml),w+wd/2,s.h],[bx,w+wd/2,s.h]]);ctx.fill();
-    const X=ipx(bx,w+wd/2),Y=ipy(bx,w+wd/2,s.h);
-    ctx.drawImage(sp.c,X-sp.ox,Y-sp.oy,sp.w,sp.h);
-   }else if(typeof isoDeckSpr==='function'){
-    const d=dw>=0?1:-1;
-    const sp=isoDeckSpr(c,d);
-    const wr=d>0?w-ml/2:w+ml/2;
-    const lx=s.x;
-    iPoly([[lx-wd/2,wr,s.h],[lx+wd/2,wr,s.h],[lx+wd/2,wr+(d>0?ml:-ml),s.h],[lx-wd/2,wr+(d>0?ml:-ml),s.h]]);ctx.fill();
-    const X=ipx(lx-wd/2,wr),Y=ipy(lx-wd/2,wr,s.h);
-    ctx.drawImage(sp.c,X-sp.ox,Y-sp.oy,sp.w,sp.h);
-   }
-  }catch(e){}
- }
- ctx.restore();
-}
-
-function marks99(S,far,near,cen){
+function marks99(S,far,near,cen,lod){
  ctx.lineWidth=2.3;ctx.strokeStyle=C.edge;ctx.setLineDash([]);
  line(far,9,.7);line(near,-9,.7);
- const width=S[Math.floor(S.length/2)].hw*2;
+ const mid=S[S.length>>1];
+ const width=mid.hw*2;
  const lanes=clamp(Math.round(width/84),1,4);
- ctx.lineWidth=2;ctx.strokeStyle=C.dash;ctx.setLineDash([16,18]);
+ ctx.lineWidth=2;ctx.strokeStyle=C.dash;ctx.setLineDash(lod>=2?[20,22]:[16,18]);
  if(lanes>=2){
   for(let L=1;L<lanes;L++){
    const frac=L/lanes;
-   line(S.map(s=>[s.x,s.c-s.hw+(2*s.hw)*frac,s.h+.7]),0,0);
+   ctx.beginPath();
+   for(let i=0;i<S.length;i++){
+    const s=S[i],w=s.c-s.hw+(2*s.hw)*frac;
+    const X=ipx(s.x,w),Y=ipy(s.x,w,s.h+.7);
+    i?ctx.lineTo(X,Y):ctx.moveTo(X,Y);
+   }
+   ctx.stroke();
   }
  }else{
   line(cen,0,0);
@@ -10944,178 +10977,238 @@ function marks99(S,far,near,cen){
  ctx.setLineDash([]);
 }
 
-function extendEnds99(S){
- // Continue a high end along its heading so the slab doesn't terminate as a
- // mid-air cross-section. Grade ends stay put (abutments handle those).
- if(!S||S.length<2)return S;
- const out=S.slice();
- function grow(end){
-  const a=end<0?out[0]:out[out.length-1];
-  const b=end<0?out[1]:out[out.length-2];
-  if(a.h<40)return;
-  const dx=Math.sign(a.x-b.x)|| (end<0?-1:1);
-  const dc=a.c-b.c, dhw=a.hw-b.hw;
-  const step=Math.max(80,Math.abs(a.x-b.x)||80);
-  let x=a.x,c=a.c,hw=a.hw;
-  for(let k=1;k<=16;k++){
-   x+=dx*step;c+=dc;hw=Math.max(36,hw+dhw);
-   const p={x,c,hw,h:a.h};
-   if(end<0)out.unshift(p);else out.push(p);
+function deck100(S,opt){
+ const t0=(typeof performance!=='undefined')?performance.now():0;
+ try{
+  opt=opt||{};
+  const n=S&&S.length;if(!n||n<2)return;
+  ctx.save();
+  ctx.globalAlpha=1;
+  const T=Math.max(opt.T||16,22);
+  const PH=16;
+  const lod=opt.only?2:lod100(S);
+  const topCol=(opt.top&&opt.top!=='#8f8a7f')?opt.top:C.top;
+  const far=clr(B.far),near=clr(B.near),farB=clr(B.farB),nearB=clr(B.nearB);
+  const farT=clr(B.farT),nearT=clr(B.nearT),farR=clr(B.farR),nearR=clr(B.nearR),cen=clr(B.cen);
+  for(const s of S){
+   far.push([s.x,s.c-s.hw,s.h]);
+   near.push([s.x,s.c+s.hw,s.h]);
+   farB.push([s.x,s.c-s.hw,Math.max(0,s.h-T)]);
+   nearB.push([s.x,s.c+s.hw,Math.max(0,s.h-T)]);
+   farT.push([s.x,s.c-s.hw,s.h+PH]);
+   nearT.push([s.x,s.c+s.hw,s.h+PH]);
+   farR.push([s.x,s.c-s.hw,s.h+PH+4]);
+   nearR.push([s.x,s.c+s.hw,s.h+PH+4]);
+   cen.push([s.x,s.c,s.h+.6]);
   }
+  if(opt.shadow!==false&&!opt.only)shadow99(S);
+
+  for(let i=0;i<n-1;i++){
+   const s=S[i],t=S[i+1];
+   if(Math.max(s.h,t.h)<1)continue;
+   if(Math.min(s.h,t.h)<48){
+    if(!seen100(s.x,s.c,s.h)&&!seen100(t.x,t.c,t.h))continue;
+    ctx.fillStyle=C.wall;
+    ctx.beginPath();
+    ctx.moveTo(ipx(s.x,s.c+s.hw),ipy(s.x,s.c+s.hw,0));
+    ctx.lineTo(ipx(t.x,t.c+t.hw),ipy(t.x,t.c+t.hw,0));
+    ctx.lineTo(ipx(t.x,t.c+t.hw),ipy(t.x,t.c+t.hw,t.h));
+    ctx.lineTo(ipx(s.x,s.c+s.hw),ipy(s.x,s.c+s.hw,s.h));
+    ctx.closePath();ctx.fill();
+    ctx.fillStyle=C.wallDk;
+    ctx.beginPath();
+    ctx.moveTo(ipx(s.x,s.c-s.hw),ipy(s.x,s.c-s.hw,0));
+    ctx.lineTo(ipx(t.x,t.c-t.hw),ipy(t.x,t.c-t.hw,0));
+    ctx.lineTo(ipx(t.x,t.c-t.hw),ipy(t.x,t.c-t.hw,t.h));
+    ctx.lineTo(ipx(s.x,s.c-s.hw),ipy(s.x,s.c-s.hw,s.h));
+    ctx.closePath();ctx.fill();
+   }
+  }
+
+  if(opt.cols){
+   const step=lod>=2?Math.max(1,3):1;
+   for(let i=opt.only?0:1;i<(opt.only?n:n-1);i+=step){
+    const s=S[i];if(s.h<46)continue;
+    const W=opt.cols(i,s);if(!W)continue;
+    bent99(s,T,W,opt.cf,lod);
+   }
+  }
+  if(opt.only){ctx.restore();return;}
+
+  // Ends: grade abutment, never a mid-air portal wall
+  const a0=S[0],a1=S[n-1];
+  if(a0.h<22)abutment99(a0, Math.sign(a0.x-(S[1]&&S[1].x||a0.x+1))||-1);
+  if(a1.h<22)abutment99(a1, Math.sign(a1.x-(S[n-2]&&S[n-2].x||a1.x-1))||1);
+
+  ctx.fillStyle=C.fasDk;strip(far,farB);
+  ctx.fillStyle=C.parDk;strip(far,farT);
+  ctx.fillStyle=C.rail;strip(farT,farR);
+  const postStep=lod>=2?4:2;
+  for(let i=0;i<n;i+=postStep){
+   const s=S[i];if(s.h<8)continue;
+   if(!seen100(s.x,s.c-s.hw,s.h+PH))continue;
+   if(lod>=2){
+    ctx.strokeStyle=C.parDk;ctx.lineWidth=1.3;
+    ctx.beginPath();
+    ctx.moveTo(ipx(s.x,s.c-s.hw),ipy(s.x,s.c-s.hw,s.h+2));
+    ctx.lineTo(ipx(s.x,s.c-s.hw),ipy(s.x,s.c-s.hw,s.h+PH+4));
+    ctx.stroke();
+   }else{
+    iBox(s.x-1.2,s.x+1.2,s.c-s.hw-1.6,s.c-s.hw+1.8,s.h+2,s.h+PH+4,C.rail,C.railDk,C.par);
+   }
+  }
+
+  ctx.fillStyle=topCol;strip(far,near);
+  ctx.fillStyle='rgba(255,255,255,.05)';
+  // highlight without S.map allocation: temporary use shade buffers
+  const hA=clr(B.shadeA),hC=clr(B.shadeB);
+  for(const s of S){hA.push([s.x,s.c-s.hw*.35,s.h+.4]);hC.push([s.x,s.c+s.hw*.35,s.h+.4]);}
+  strip(hA,hC);
+
+  const grid=lod>=2?180:90;
+  for(let i=0;i<n-1;i++){
+   const s=S[i],t=S[i+1];
+   const lo=Math.min(s.x,t.x),hi=Math.max(s.x,t.x);
+   const a=Math.ceil(lo/grid)*grid;
+   if(a<hi && (lod<2||seen100(a,s.c,s.h))){
+    const span=(t.x-s.x)||1,u=(a-s.x)/span;
+    const c=s.c+(t.c-s.c)*u,hw=s.hw+(t.hw-s.hw)*u,h=s.h+(t.h-s.h)*u;
+    ctx.fillStyle=C.seam;
+    iPoly([[a-1.2,c-hw+6,h+.7],[a+1.2,c-hw+6,h+.7],[a+1.2,c+hw-6,h+.7],[a-1.2,c+hw-6,h+.7]]);ctx.fill();
+   }
+   if(lod<2 && (i+Math.round(s.x))%2===0 && seen100(s.x,s.c,s.h)){
+    ctx.fillStyle=C.grain;
+    const gx=s.x+7,gc=s.c+(hr(i,5)-.5)*s.hw*.7;
+    iPoly([[gx,gc-4,s.h+.7],[gx+18,gc-3,s.h+.7],[gx+18,gc+3,s.h+.7],[gx,gc+4,s.h+.7]]);ctx.fill();
+   }
+  }
+
+  marks99(S,far,near,cen,lod);
+  // no cars99 — user does not want traffic on these bridges
+  poles99(S,PH,lod);
+
+  ctx.fillStyle=C.fas;strip(near,nearB);
+  ctx.strokeStyle=C.fasDk;ctx.lineWidth=1.6;line(nearB,0,1);
+  ctx.strokeStyle=C.fasLip;ctx.lineWidth=1.4;line(near,0,0);
+
+  ctx.fillStyle=C.par;strip(near,nearT);
+  ctx.fillStyle=C.rail;strip(nearT,nearR);
+  ctx.strokeStyle='#f7f3e8';ctx.lineWidth=1.5;line(nearR,0,0);
+  for(let i=0;i<n;i+=postStep){
+   const s=S[i];if(s.h<8)continue;
+   if(!seen100(s.x,s.c+s.hw,s.h+PH))continue;
+   if(lod>=2){
+    ctx.strokeStyle=C.par;ctx.lineWidth=1.3;
+    ctx.beginPath();
+    ctx.moveTo(ipx(s.x,s.c+s.hw),ipy(s.x,s.c+s.hw,s.h+2));
+    ctx.lineTo(ipx(s.x,s.c+s.hw),ipy(s.x,s.c+s.hw,s.h+PH+4));
+    ctx.stroke();
+   }else{
+    iBox(s.x-1.3,s.x+1.3,s.c+s.hw-1.8,s.c+s.hw+1.7,s.h+2,s.h+PH+4,C.rail,C.railDk,C.par);
+   }
+  }
+  ctx.strokeStyle='rgba(120,116,104,.55)';ctx.lineWidth=1.3;
+  line(near,0,PH*.45);line(far,0,PH*.45);
+
+  ctx.globalAlpha=1;
+  ctx.restore();
+ }catch(e){onceErr('deck',e);try{ctx.restore();}catch(_e){}}
+ finally{
+  if(typeof performance!=='undefined'){
+   const dt=performance.now()-t0;
+   const p=window.FJ100perf||(window.FJ100perf={n:0,ms:0,max:0});
+   p.n++;p.ms+=dt;if(dt>p.max)p.max=dt;
+  }
+  SEEN.deck++;
  }
- grow(-1);grow(1);
- return out;
 }
 
-function portal99(s,dir){
- // Concrete end diaphragm + wings so a high ribbon joins a deck instead of ending as a raw cut.
- const hw=s.hw,c=s.c,x=s.x,H=s.h;
- ctx.globalAlpha=1;
- iBox(x-18,x+18,c-hw-22,c+hw+22,0,H+22,C.cap,C.capDk,C.wall);
- iBox(x-28,x+28,c-hw-28,c+hw+28,H+14,H+26,C.cap,C.colDk,C.colHi);
- ctx.fillStyle=C.wall;
- iPoly([[x-12,c+hw,H+8],[x+12,c+hw,H+8],[x+12,c+hw+90,16],[x-12,c+hw+90,16]]);ctx.fill();
- iPoly([[x-12,c-hw,H+8],[x+12,c-hw,H+8],[x+12,c-hw-90,16],[x-12,c-hw-90,16]]);ctx.fill();
- ctx.fillStyle=C.wallDk;
- iPoly([[x+dir*18,c-hw-22,H+22],[x+dir*18,c+hw+22,H+22],[x+dir*18,c+hw+22,0],[x+dir*18,c-hw-22,0]]);ctx.fill();
-}
-
-function deck99(S,opt){
- opt=opt||{};
- const n=S.length;if(n<2)return;
- ctx.save();
- ctx.globalAlpha=1;
- const T=Math.max(opt.T||16,22);
- const PH=16;
- const topCol=(opt.top&&opt.top!=='#8f8a7f')?opt.top:C.top;
- const far=[],near=[],farB=[],nearB=[],farT=[],nearT=[],farR=[],nearR=[],cen=[];
- for(const s of S){
-  far.push([s.x,s.c-s.hw,s.h]);
-  near.push([s.x,s.c+s.hw,s.h]);
-  farB.push([s.x,s.c-s.hw,Math.max(0,s.h-T)]);
-  nearB.push([s.x,s.c+s.hw,Math.max(0,s.h-T)]);
-  farT.push([s.x,s.c-s.hw,s.h+PH]);
-  nearT.push([s.x,s.c+s.hw,s.h+PH]);
-  farR.push([s.x,s.c-s.hw,s.h+PH+4]);
-  nearR.push([s.x,s.c+s.hw,s.h+PH+4]);
-  cen.push([s.x,s.c,s.h+.6]);
- }
- if(opt.shadow!==false)shadow99(S);
-
- for(let i=0;i<n-1;i++){
-  const s=S[i],t=S[i+1];
-  if(Math.max(s.h,t.h)<1)continue;
-  if(Math.min(s.h,t.h)<48){
-   ctx.fillStyle=C.wall;
-   ctx.beginPath();
-   ctx.moveTo(ipx(s.x,s.c+s.hw),ipy(s.x,s.c+s.hw,0));
-   ctx.lineTo(ipx(t.x,t.c+t.hw),ipy(t.x,t.c+t.hw,0));
-   ctx.lineTo(ipx(t.x,t.c+t.hw),ipy(t.x,t.c+t.hw,t.h));
-   ctx.lineTo(ipx(s.x,s.c+s.hw),ipy(s.x,s.c+s.hw,s.h));
-   ctx.closePath();ctx.fill();
-   ctx.fillStyle=C.wallDk;
-   ctx.beginPath();
-   ctx.moveTo(ipx(s.x,s.c-s.hw),ipy(s.x,s.c-s.hw,0));
-   ctx.lineTo(ipx(t.x,t.c-t.hw),ipy(t.x,t.c-t.hw,0));
-   ctx.lineTo(ipx(t.x,t.c-t.hw),ipy(t.x,t.c-t.hw,t.h));
-   ctx.lineTo(ipx(s.x,s.c-s.hw),ipy(s.x,s.c-s.hw,s.h));
-   ctx.closePath();ctx.fill();
-  }
- }
-
- if(opt.cols){
-  for(let i=opt.only?0:1;i<(opt.only?n:n-1);i++){
-   const s=S[i];if(s.h<46)continue;
-   const W=opt.cols(i,s);if(!W)continue;
-   bent99(s,T,W,opt.cf);
-  }
- }
- if(opt.only){ctx.restore();return;}
-
- if(S[0].h<22)abutment99(S[0],-1);
- else if(S[0].h>48)portal99(S[0], Math.sign(S[0].x-(S[1]&&S[1].x||S[0].x-1))||-1);
- if(S[n-1].h<22)abutment99(S[n-1],1);
- else if(S[n-1].h>48)portal99(S[n-1], Math.sign(S[n-1].x-(S[n-2]&&S[n-2].x||S[n-1].x+1))||1);
-
- ctx.fillStyle=C.fasDk;strip(far,farB);
- ctx.fillStyle=C.parDk;strip(far,farT);
- ctx.fillStyle=C.rail;strip(farT,farR);
- for(let i=0;i<n;i+=2){
-  const s=S[i];if(s.h<8)continue;
-  iBox(s.x-1.2,s.x+1.2,s.c-s.hw-1.6,s.c-s.hw+1.8,s.h+2,s.h+PH+4,C.rail,C.railDk,C.par);
- }
-
- ctx.fillStyle=topCol;strip(far,near);
- ctx.fillStyle='rgba(255,255,255,.05)';
- strip(S.map(s=>[s.x,s.c-s.hw*.35,s.h+.4]),S.map(s=>[s.x,s.c+s.hw*.35,s.h+.4]));
-
- for(let i=0;i<n-1;i++){
-  const s=S[i],t=S[i+1],grid=90;
-  const lo=Math.min(s.x,t.x),hi=Math.max(s.x,t.x);
-  const a=Math.ceil(lo/grid)*grid;
-  if(a<hi){
-   const span=(t.x-s.x)||1,u=(a-s.x)/span;
-   const c=s.c+(t.c-s.c)*u,hw=s.hw+(t.hw-s.hw)*u,h=s.h+(t.h-s.h)*u;
-   ctx.fillStyle=C.seam;
-   iPoly([[a-1.2,c-hw+6,h+.7],[a+1.2,c-hw+6,h+.7],[a+1.2,c+hw-6,h+.7],[a-1.2,c+hw-6,h+.7]]);ctx.fill();
-  }
-  if((i+Math.round(s.x))%2===0){
-   ctx.fillStyle=C.grain;
-   const gx=s.x+7,gc=s.c+(hr(i,5)-.5)*s.hw*.7;
-   iPoly([[gx,gc-4,s.h+.7],[gx+18,gc-3,s.h+.7],[gx+18,gc+3,s.h+.7],[gx,gc+4,s.h+.7]]);ctx.fill();
-  }
- }
-
- marks99(S,far,near,cen);
- cars99(S);
- poles99(S,PH);
-
- ctx.fillStyle=C.fas;strip(near,nearB);
- ctx.strokeStyle=C.fasDk;ctx.lineWidth=1.6;line(nearB,0,1);
- ctx.strokeStyle=C.fasLip;ctx.lineWidth=1.4;line(near,0,0);
-
- ctx.fillStyle=C.par;strip(near,nearT);
- ctx.fillStyle=C.rail;strip(nearT,nearR);
- ctx.strokeStyle='#f7f3e8';ctx.lineWidth=1.5;line(nearR,0,0);
- for(let i=0;i<n;i+=2){
-  const s=S[i];if(s.h<8)continue;
-  iBox(s.x-1.3,s.x+1.3,s.c+s.hw-1.8,s.c+s.hw+1.7,s.h+2,s.h+PH+4,C.rail,C.railDk,C.par);
- }
- ctx.strokeStyle='rgba(120,116,104,.55)';ctx.lineWidth=1.3;
- line(near,0,PH*.45);line(far,0,PH*.45);
-
- ctx.globalAlpha=1;
- ctx.restore();
-}
-
-b89Deck=deck99;
+// --- replace b89Deck ---
+b89Deck=deck100;
 b89Deck._v99=1;
+b89Deck._v100=1;
 b89Deck._op98=1;
 
-if(typeof b89FlyGeom==='function'&&!b89FlyGeom._v99){
- const _g=b89FlyGeom;
+// Cache flyover geom (landings included) so we don't rebuild or re-land every frame.
+const FLYC=new Map();
+if(typeof b89FlyGeom==='function'&&!b89FlyGeom._v100){
+ const _g=b89FlyGeom._v99? (function(){
+  // unwrap one layer if present by calling current, but cache the result
+  return b89FlyGeom;
+ })() : b89FlyGeom;
+ // If v99 already wrapped, _g adds 420-unit h=0 stubs. We still ensureLanded.
+ const inner=b89FlyGeom;
  b89FlyGeom=function(x,d){
-  const S=_g(x,d)||[];
-  if(S.length<2)return S;
-  const a=S[0],b=S[S.length-1],n1=S[1],n2=S[S.length-2];
-  const da=Math.sign(a.x-n1.x)||-1, db=Math.sign(b.x-n2.x)||1;
-  S.unshift({x:a.x+da*420,c:a.c,hw:a.hw,h:0});
-  S.push({x:b.x+db*420,c:b.c,hw:b.hw,h:0});
+  const k=(x||0)+':'+(d||1);
+  let S=FLYC.get(k);
+  if(S)return S;
+  try{
+   S=inner(x,d)||[];
+   if(S.length>=2 && !S._stubbed){
+    // Curve each end away from the freeway (further into the far field) while
+    // descending to grade, then keep a short at-grade stub. This way a
+    // mid-span that would have clipped at the left/right screen edge instead
+    // recedes toward the horizon, and the visible end is a landing + abutment
+    // rather than a mid-air slab cut.
+    function recede(end){
+     const a=end<0?S[0]:S[S.length-1];
+     const b=end<0?S[1]:S[S.length-2];
+     const sx=Math.sign(a.x-b.x)||end;
+     const farDir=a.c<80?-1:1;
+     const STEPS=8,LX=680,LC=640;
+     const h0=a.h,c0=a.c,x0=a.x,hw=a.hw;
+     const pts=[];
+     for(let k=1;k<=STEPS;k++){
+      const u=k/STEPS,e=sm100(u);
+      pts.push({x:x0+sx*LX*u,c:c0+farDir*LC*e,hw:hw,h:h0*(1-e)});
+     }
+     // one more at-grade beat further away so the street continues offscreen
+     const last=pts[pts.length-1];
+     pts.push({x:last.x+sx*240,c:last.c+farDir*180,hw:hw,h:0});
+     if(end<0){for(let k=pts.length-1;k>=0;k--)S.unshift(pts[k]);}
+     else{for(let k=0;k<pts.length;k++)S.push(pts[k]);}
+    }
+    recede(-1);recede(1);
+    S._stubbed=1;S._landed=1;
+   }
+   FLYC.set(k,S);
+  }catch(e){onceErr('flygeom',e);S=S||[];}
   return S;
  };
  b89FlyGeom._v99=1;
+ b89FlyGeom._v100=1;
 }
 
-
-if(typeof b89RampDraw==='function'&&!b89RampDraw._v99){
- const _rd=b89RampDraw;
+// Draw the FULL ramp ribbon (far or near half) whenever any of it is in range.
+// Tight lo/hi clipping was ending mid-span slabs at the screen edge.
+if(typeof b89RampDraw==='function'&&!b89RampDraw._v100){
  b89RampDraw=function(xe,dir,lo,hi,nearPass){
-  return _rd(xe,dir,(lo||0)-360,(hi||0)+360,nearPass);
+  try{
+   const S=typeof b89Ramp==='function'?b89Ramp(xe,dir):null;
+   if(!S||S.length<2)return;
+   // Do not landEnds the peel-off: the freeway end must stay high and merge
+   // into the overpass. The far end already reaches grade (h→0).
+   if(!structVis(S,lo,hi))return;
+   const R=[],C=[],ov=s=>s.c+s.hw>-80;
+   for(let i=0;i<S.length;i++){
+    const s=S[i],o=ov(s);
+    if(o===!!nearPass||(!nearPass&&S[i-1]&&ov(S[i-1])&&!o)||(!nearPass&&o&&S[i+1]&&!ov(S[i+1])))R.push(s);
+    if(!nearPass&&o)C.push(s);
+   }
+   const cols=(typeof b89Cols==='function')
+    ?(i,s)=>b89Cols(Math.round(Math.abs(s.x-xe)/50),s)
+    :null;
+   if(!nearPass&&C.length)b89Deck(C,{T:20,only:true,cols,cf:w=>w<-74});
+   if(R.length<2)return;
+   if(dir<0)R.reverse();
+   b89Deck(R,{T:20,top:'#8f8a7f',cols,cf:nearPass?(w=>w>-74):null});
+  }catch(e){onceErr('ramp',e);}
  };
  b89RampDraw._v99=1;
+ b89RampDraw._v100=1;
 }
 
-if(typeof decks97==='function'){
+if(typeof decks97==='function'&&!decks97._v100){
  const _d=decks97;
  decks97=function(){
   if(typeof LV!=='undefined'&&LV===1&&state&&state.sub85&&typeof sub85N==='function'&&sub85N()===3){
@@ -11124,21 +11217,24 @@ if(typeof decks97==='function'){
   }
   return _d();
  };
+ decks97._v100=1;
 }
-if(typeof deck97On==='function'){
+if(typeof deck97On==='function'&&!deck97On._v100){
  const _on=deck97On;
  deck97On=function(){
   return _on()||(typeof LV!=='undefined'&&LV===1&&state&&state.sub85&&typeof sub85N==='function'&&sub85N()===3&&typeof lax84Road==='function'&&lax84Road());
  };
+ deck97On._v100=1;
 }
-if(typeof b89Sub2==='function'){
+if(typeof b89Sub2==='function'&&!b89Sub2._v100){
  const _b=b89Sub2;
  b89Sub2=function(){
   if(typeof deck97On==='function'&&deck97On())return true;
   return _b();
  };
+ b89Sub2._v100=1;
 }
-if(typeof b89Decks==='function'){
+if(typeof b89Decks==='function'&&!b89Decks._v100){
  const _bd=b89Decks;
  b89Decks=function(){
   const all=typeof decks97==='function'?decks97():_bd();
@@ -11147,9 +11243,10 @@ if(typeof b89Decks==='function'){
   }
   return all;
  };
+ b89Decks._v100=1;
 }
 
-if(typeof sub85Scenery==='function'&&!sub85Scenery._v99){
+if(typeof sub85Scenery==='function'&&!sub85Scenery._v100){
  const _sc=sub85Scenery;
  sub85Scenery=function(xmin,xmax){
   const r=_sc(xmin,xmax);
@@ -11167,13 +11264,30 @@ if(typeof sub85Scenery==='function'&&!sub85Scenery._v99){
      const x=p[0],d=p[1];push(x,-620,function(){lax84Flyover(x,d);});
     });
    }
-  }catch(e){}
+  }catch(e){onceErr('scenery',e);}
   return r;
  };
  sub85Scenery._v99=1;
+ sub85Scenery._v100=1;
 }
 
-window.FJ99={deck:deck99};
+// Wallpaper cache: cap sizes, keep more entries, never evict the live theme pair.
+if(typeof window.FJ98!=='undefined'){
+ try{
+  // patched in v98_bg.js cv(); hook a guard on bg98Draw
+  const _d=window.FJ98draw;
+  if(_d&&!_d._v100){
+   window.FJ98draw=function(cam,vw){
+    try{return _d(cam,vw);}
+    catch(e){onceErr('bg',e);return false;}
+   };
+   window.FJ98draw._v100=1;
+   if(window.FJ98)window.FJ98.draw=window.FJ98draw;
+  }
+ }catch(e){onceErr('bghook',e);}
+}
+
+window.FJ100={deck:deck100,land:landEnds100,onceErr};
 })();
 
 </script></body></html>
