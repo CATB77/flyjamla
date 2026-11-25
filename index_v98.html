@@ -10606,10 +10606,12 @@ function drawTiled(img,x,y,dw,dh){
 function bg98Draw(cam,vw){
  if(typeof IO==='undefined'||!ctx)return false;
  const id=themeId();
+ const flying=IO.hz<0; // skyRender (Neo-LA) has no dy-translate
  const dy=IO.hz-445;
  ctx.save();
- ctx.translate(0,-dy); // back to untranslated screen space
- const vh=Math.max(160,visHz());
+ if(!flying) ctx.translate(0,-dy); // back to untranslated screen space
+ // Paint well behind the asphalt; the opaque road covers the overlap so no wallpaper leaks through.
+ const vh=flying?360:Math.max(visHz()+120, 560);
  const W=1024,H=360;
  const still=cv('s_'+id,W,H,function(o,w,h){paintStill(o,w,h,id);});
  const clds=cv('c_'+id,W,220,function(o,w,h){paintClouds(o,w,h,id);});
@@ -10658,16 +10660,61 @@ function bg98Draw(cam,vw){
 }
 
 function HZ98(){
- let lot=0;
- try{if(typeof lot96On==='function'&&lot96On())lot=60;}catch(e){}
- // raise the horizon so the wallpaper sits in a visible band under the HUD
- return Math.max(lot, 90);
+ // Do NOT raise IO.hz: iVis() and isoGround's clip use it, and a +90 bump
+ // faded/clipped the far (oncoming) carriageway so the wallpaper showed through.
+ return 0;
 }
-if(typeof HZ96==='function'){
- const _HZ=HZ96;
- HZ96=function(){return Math.max(_HZ(), HZ98());};
+// Keep the original HZ96 (6-3 lot +60 only). Do not wrap it with +90.
+
+// Drop the iso world slightly so more of the wallpaper is visible under the HUD
+// without moving the ground clip / iVis horizon.
+if(typeof A93cy==='function'){
+ const _A93=A93cy;
+ A93cy=function(){const base=_A93(); const extra=(typeof CITY==='function'&&CITY())?24:70; return base+extra;};
 }else{
- HZ96=HZ98;
+ A93cy=function(){return (typeof CITY==='function'&&CITY())?24:70;};
+}
+
+// Belt-and-suspenders: never start the ground pass with a leftover alpha.
+if(typeof isoGround==='function'){
+ const _ig=isoGround;
+ isoGround=function(xmin,xmax,vw){ctx.globalAlpha=1;return _ig(xmin,xmax,vw);};
+}
+
+// Far/oncoming approaches and overpasses were faded with iVis()*SA, so the
+// wallpaper showed through mid-screen ramps (especially 1-2). Force those
+// road surfaces and their structure to stay fully opaque.
+function opaqueRoads98(){
+ function wrap(fn){
+  return function(S,sg){
+   const prev=typeof SA==='undefined'?1:SA;
+   SA=1;ctx.globalAlpha=1;
+   try{return fn(S,sg);}
+   finally{SA=prev;}
+  };
+ }
+ if(typeof structApproach==='function'&&!structApproach._op98){
+  const w=wrap(structApproach);w._op98=1;structApproach=w;
+ }
+ if(typeof structDraw==='function'&&!structDraw._op98){
+  const w=wrap(structDraw);w._op98=1;structDraw=w;
+ }
+}
+opaqueRoads98();
+
+// 1-2 peel-off decks used a 0.8–1.0 per-segment alpha on the asphalt ribbon, so
+// the wallpaper (and the lower freeway) showed through mid-screen ramps.
+if(typeof b89Deck==='function'&&!b89Deck._op98){
+ const _d=b89Deck;
+ b89Deck=function(S,opt){
+  opt=Object.assign({},opt||{});
+  delete opt.alpha;
+  const prev=ctx.globalAlpha;
+  ctx.globalAlpha=1;
+  try{return _d(S,opt);}
+  finally{ctx.globalAlpha=prev;}
+ };
+ b89Deck._op98=1;
 }
 
 function hookScenery(){
